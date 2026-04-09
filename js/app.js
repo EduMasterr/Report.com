@@ -64,7 +64,11 @@ let EMPLOYEES = JSON.parse(localStorage.getItem('bms_employees') || 'null') || [
 // Firebase Sync & Cloud Storage
 // -------------------------
 window.syncWithCloud = function() {
-    if (!window.db) return console.warn("⚠️ Firebase not initialized");
+    if (!window.db) {
+        // Try again in 500ms if not ready yet
+        setTimeout(syncWithCloud, 500);
+        return console.warn("⏳ Waiting for Firebase initialization...");
+    }
     console.log("☁️ Syncing with cloud...");
     
     // Real-time branches

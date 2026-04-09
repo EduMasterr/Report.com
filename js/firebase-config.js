@@ -1,12 +1,13 @@
 // Firebase Configuration and Initialization for Report System
 const firebaseConfig = {
-    apiKey: "AIzaSyCZu1z-QNPaV6coFAXg9MwU0gvWcI_tM5E",
-    authDomain: "million-journey-5ae07.firebaseapp.com",
-    databaseURL: "https://million-journey-5ae07-default-rtdb.firebaseio.com",
-    projectId: "million-journey-5ae07",
-    storageBucket: "million-journey-5ae07.firebasestorage.app",
-    messagingSenderId: "730981110023",
-    appId: "1:730981110023:web:9bebe4dcb6446c8fbc35a2"
+    apiKey: "AIzaSyB0cSh1kSSaqumLeLNrN_7eWa5JFV-valg",
+    authDomain: "report-20026.firebaseapp.com",
+    databaseURL: "https://report-20026-default-rtdb.firebaseio.com",
+    projectId: "report-20026",
+    storageBucket: "report-20026.firebasestorage.app",
+    messagingSenderId: "72790875487",
+    appId: "1:72790875487:web:3b21e2a6e1ae4c0524eaea",
+    measurementId: "G-9CFZ6VJ4RS"
 };
 
 // Initialize Firebase
@@ -14,5 +15,6 @@ if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 
-const db = firebase.database();
+// Initialize Firebase Database and share it globally
+window.db = firebase.database();
 console.log("🔥 Firebase Initialized and Connected");
