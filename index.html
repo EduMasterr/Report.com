@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>التقرير اليومي والماليات | Report</title>
+    <meta name="description" content="Report - التقرير اليومي والماليات وإدارة الفروع">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+
+<body>
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">💰</div>
+                <span class="logo-text">Report</span>
+            </div>
+            <button class="sidebar-toggle-header" id="themeToggle" aria-label="Toggle Theme">
+                <span class="theme-icon" id="themeIcon">🌙</span>
+            </button>
+            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Sidebar">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">لوحة التحكم</span>
+            </a>
+            <a href="#" class="nav-item" data-page="report" id="nav-report">
+                <span class="nav-icon">📝</span>
+                <span class="nav-label">التقرير اليومي</span>
+            </a>
+            <a href="#" class="nav-item" data-page="branches" id="nav-branches">
+                <span class="nav-icon">🏢</span>
+                <span class="nav-label">إدارة الفروع</span>
+            </a>
+            <a href="#" class="nav-item" data-page="employees" id="nav-employees">
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">الموظفين</span>
+            </a>
+            <a href="#" class="nav-item" data-page="finance" id="nav-finance">
+                <span class="nav-icon">💰</span>
+                <span class="nav-label">المالية</span>
+            </a>
+            <a href="#" class="nav-item" data-page="admin" id="nav-admin">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">الأدمن إديتور</span>
+            </a>
+        </nav>
+
+        <div style="margin-top:auto; padding-bottom: 20px;">
+            <a href="javascript:void(0)" class="nav-item" onclick="forceSyncData()">
+                <span class="nav-icon">🔄</span>
+                <span class="nav-label">مزامنة البيانات</span>
+            </a>
+            <a href="javascript:void(0)" class="nav-item" onclick="createLocalBackup()">
+                <span class="nav-icon">💾</span>
+                <span class="nav-label">نسخة احتياطية</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Main Content Area -->
+    <main class="main-content" id="mainContent">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open Menu">☰</button>
+            <div class="topbar-title">
+                <h2 id="pageTitle">لوحة التحكم</h2>
+                <span class="topbar-date" id="currentDate"></span>
+            </div>
+
+            <div class="digital-clock" id="digitalClock">
+                <span id="hrs">00</span>:<span id="min">00</span>:<span id="sec">00</span>
+            </div>
+
+            <div class="cloud-status disconnected" id="cloudStatus" title="حالة الاتصال السحابي">
+                <span class="status-dot"></span>
+                <span class="status-text">جاري الاتصال...</span>
+            </div>
+
+            <div class="topbar-actions">
+                <div class="branch-selector">
+                    <select id="branchSelect">
+                        <option value="" disabled selected>اختر الفرع...</option>
+                        <option value="all">جميع الفروع</option>
+                        <option value="miami">فرع ميامي</option>
+                        <option value="mandara">فرع المندرة</option>
+                        <option value="soyouf">فرع السيوف</option>
+                        <option value="smouha">فرع سموحة</option>
+                        <option value="agamy">فرع العجمي</option>
+                        <option value="branch6">الفرع السادس</option>
+                    </select>
+                </div>
+                <div class="user-profile-group"
+                    style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                    <div class="user-avatar" id="userAvatar" style="margin:0;">
+                        <span>م</span>
+                    </div>
+                    <button onclick="logout()"
+                        style="background:none; border:none; color:var(--text-secondary); font-size:10px; font-weight:700; cursor:pointer; padding:2px 5px; border-radius:4px; transition:var(--transition); margin-top:2px;"
+                        onmouseover="this.style.color='#e74c3c'; this.style.background='rgba(231, 76, 60, 0.1)'"
+                        onmouseout="this.style.color='var(--text-secondary)'; this.style.background='none'">خروج</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Page Content (dynamic) -->
+        <div class="page-content" id="pageContent">
+        </div>
+    </main>
+
+    <!-- Firebase SDK (Compat Mode) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>
