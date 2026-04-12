@@ -191,7 +191,7 @@ function saveData() {
 
         // Use ATOMIC UPDATES to prevent deleting other branches' data
         const updates = {};
-        updates['/reports'] = AppState.reports || [];
+        // updates['/reports'] = AppState.reports || []; // DEPRECATED: update can cause duplication
         updates['/branches'] = BRANCHES || {};
         updates['/employees'] = EMPLOYEES || [];
         updates['/budgets'] = AppState.budgets || [];
@@ -199,10 +199,13 @@ function saveData() {
         // Specially update ledgers to MERGE branch entries
         db.ref(AppState.systemSecret + '/bms/ledgers').update(AppState.ledgers || {});
         
+        // Use SET for reports to ensure they are cleaned and replaced correctly without duplicates
+        db.ref(AppState.systemSecret + '/bms/reports').set(AppState.reports || []);
+        
         // Push bulk updates for other categories
         db.ref(AppState.systemSecret + '/bms').update(updates);
         
-        console.log("☁️ Nitro-Sync: Cloud updated atomically.");
+        console.log("☁️ Nitro-Sync: Cloud cleaned and updated atomically.");
     }
 }
 
@@ -709,13 +712,13 @@ window.forceSyncData = async function() {
             localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
             localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
             
-            // Push cleaned/deduplicated data back to cloud if we are lead
-            if (AppState.isInitialSyncComplete) saveData();
-            
             // Update Nitro Flag
             AppState.isInitialSyncComplete = true;
             
-            showToast('تم تحديث البيانات من السحابة بنجاح ✅', 'success');
+            // Push cleaned/deduplicated data back to cloud to wipe any old mess
+            saveData();
+            
+            showToast('تم تحديث البيانات وتنظيف السحابة بنجاح ✅', 'success');
             
             // Force Full UI Refresh
             navigate(AppState.currentPage);
