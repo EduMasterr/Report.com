@@ -75,6 +75,7 @@ window.syncWithCloud = function() {
     
     // Real-time branches
     db.ref(AppState.systemSecret + '/bms/branches').on('value', snap => {
+        if (!AppState.userRole) return;
         if (snap.exists()) {
             BRANCHES = snap.val();
             localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
@@ -84,6 +85,7 @@ window.syncWithCloud = function() {
 
     // Real-time employees
     db.ref(AppState.systemSecret + '/bms/employees').on('value', snap => {
+        if (!AppState.userRole) return;
         if (snap.exists()) {
             EMPLOYEES = snap.val();
             localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
@@ -93,6 +95,7 @@ window.syncWithCloud = function() {
 
     // Real-time reports
     db.ref(AppState.systemSecret + '/bms/reports').on('value', snap => {
+        if (!AppState.userRole) return;
         if (snap.exists()) {
             AppState.reports = snap.val();
             localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
@@ -103,6 +106,7 @@ window.syncWithCloud = function() {
 
     // Real-time budgets
     db.ref(AppState.systemSecret + '/bms/budgets').on('value', snap => {
+        if (!AppState.userRole) return;
         if (snap.exists()) {
             AppState.budgets = snap.val();
             localStorage.setItem('bms_budgets', JSON.stringify(AppState.budgets));
@@ -113,13 +117,14 @@ window.syncWithCloud = function() {
 
     // Real-time ledgers
     db.ref(AppState.systemSecret + '/bms/ledgers').on('value', snap => {
+        if (!AppState.userRole) return;
         if (snap.exists()) {
             AppState.ledgers = snap.val();
             localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
             console.log("✅ Ledgers synced");
             if (AppState.currentPage === 'dailybudget') renderDailyBudget(document.getElementById('pageContent'));
             if (AppState.currentPage === 'dashboard') renderDashboard(document.getElementById('pageContent'));
-            if (AppState.currentPage === 'report') renderReport(document.getElementById('pageContent'), null);
+            // Removal of automatic report re-render to prevent UI freezing during sync
         }
     });
 
@@ -626,17 +631,24 @@ window.forceSyncData = async function() {
 };
 
 window.logout = function() {
+    // 1. Save data before clearing if we have a role
     if (AppState.userRole) {
         saveData();
-        // Force manual check on logout so it doesn't just download silently
-        createLocalBackup(false); 
+        // Trigger a silent backup attempt
+        try { createLocalBackup(true); } catch(e) {}
     }
     
+    // 2. Clear Session State
     AppState.userRole = null;
     AppState.userBranch = null;
+    
+    // 3. Clear Login Credentials from persistence
     localStorage.removeItem('bms_role');
+    localStorage.removeItem('bms_branch');
     localStorage.setItem('bms_auto_login', 'false');
-    showLoginScreen();
+    
+    // 4. Force reload to clear all active Firebase listeners and reset memory
+    window.location.reload();
 };
 
 function updateNavVisibility() {
@@ -1495,7 +1507,7 @@ function renderReport(el, existingData = null) {
     `;
     
     // Initial population
-    const bKey = (AppState.userRole === 'branch') ? AppState.userBranch : document.getElementById('branchSelect2').value;
+    const currentBKey = (AppState.userRole === 'branch') ? AppState.userBranch : document.getElementById('branchSelect2').value;
     
     // Set saved value for reporter dropdown first
     const reporterSelect = document.getElementById('reportedBy');
