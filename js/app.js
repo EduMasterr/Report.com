@@ -838,7 +838,7 @@ function renderDashboard(el) {
 
     if (isBranch) {
         const lKey = `${AppState.userBranch}_${tDate}`;
-        if (AppState.ledgers[lKey]) {
+        if (isLedgerActive(lKey)) {
             totalRevenue = calculateLedgerInflow(lKey);
             totalExpenses = calculateLedgerOutflow(lKey);
             currentBalance = calculateLedgerEndBalance(lKey);
@@ -859,7 +859,7 @@ function renderDashboard(el) {
         // Manager/Dev "Total" for all branches today
         Object.keys(BRANCHES).forEach(bKey => {
             const lKey = `${bKey}_${tDate}`;
-            if (AppState.ledgers[lKey]) {
+            if (isLedgerActive(lKey)) {
                 totalRevenue += calculateLedgerInflow(lKey);
                 totalExpenses += calculateLedgerOutflow(lKey);
                 currentBalance += calculateLedgerEndBalance(lKey);
@@ -891,7 +891,7 @@ function renderDashboard(el) {
         // Today's details for the card
         const lKey = `${key}_${tDate}`;
         let tRev = 0, tExp = 0, tBal = 0;
-        if (AppState.ledgers[lKey]) {
+        if (isLedgerActive(lKey)) {
             tRev = calculateLedgerInflow(lKey);
             tExp = calculateLedgerOutflow(lKey);
             tBal = calculateLedgerEndBalance(lKey);
@@ -984,9 +984,9 @@ function renderDashboard(el) {
                     <span class="official-stat-label">الاتصالات / الحجوزات</span>
                     <span class="official-stat-value">${bd.bCalls} / ${bd.bBookings}</span>
                 </div>
-                <div class="official-stat-row" style="background:#fdf5e6; border-top:1px solid #000;">
-                    <span class="official-stat-label">الرصيد الفعلي الحالي</span>
-                    <span class="official-stat-value" style="color:#b20000 !important;">${formatNumber(bd.tBal || 0)} ج.م</span>
+                <div class="official-stat-row" style="background: rgba(231, 76, 60, 0.08); border-top: 2px solid #e74c3c;">
+                    <span class="official-stat-label" style="font-weight: 900; color: #e74c3c;">الرصيد الفعلي الحالي</span>
+                    <span class="official-stat-value" style="color: #c0392b !important; font-size: 18px; font-weight: 950; text-shadow: 0 1px 2px rgba(0,0,0,0.05);">${formatNumber(bd.tBal || 0)} ج.م</span>
                 </div>
             </div>
             ${isBranch ? `
@@ -1044,7 +1044,7 @@ function renderManagerDashboard(el) {
 
     branchData.forEach(bd => {
         const lKey = `${bd.key}_${tDate}`;
-        if (AppState.ledgers[lKey]) {
+        if (isLedgerActive(lKey)) {
             bd.tRev = calculateLedgerInflow(lKey);
             bd.tExp = calculateLedgerOutflow(lKey);
             bd.tBal = calculateLedgerEndBalance(lKey);
@@ -1108,9 +1108,9 @@ function renderManagerDashboard(el) {
                     <span class="official-stat-label">السكرتارية المختصة</span>
                     <span class="official-stat-value" style="font-size:13px;">${bd.bSecretaries.map(s => s.name).join(' · ') || '—'}</span>
                 </div>
-                <div class="official-stat-row" style="background:#fdf5e6; border-top: 1px solid #000;">
-                    <span class="official-stat-label">الرصيد الفعلي الحالي</span>
-                    <span class="official-stat-value" style="color:#b20000 !important;">${formatNumber(bd.tBal)} ج.م</span>
+                <div class="official-stat-row" style="background: rgba(231, 76, 60, 0.08); border-top: 2px solid #e74c3c;">
+                    <span class="official-stat-label" style="font-weight: 900; color: #e74c3c;">الرصيد الفعلي الحالي</span>
+                    <span class="official-stat-value" style="color: #c0392b !important; font-size: 18px; font-weight: 950; text-shadow: 0 1px 2px rgba(0,0,0,0.05);">${formatNumber(bd.tBal)} ج.م</span>
                 </div>
             </div>
         </div>`).join('')}
@@ -1258,7 +1258,7 @@ window.renderOfficialTable = function(report) {
             <!-- Row 2: Stats -->
             <div class="official-cell">عدد الاتصالات : ${report.morning?.calls || 0}</div>
             <div class="official-cell">حجوزات الفتره الصباحيه : ${report.morning?.bookings || 0}</div>
-            <div class="official-cell" style="background:#fdf5e6;">ايراد الفترة الصباحية : ${formatNumber(report.morning?.inflow || 0)}</div>
+            <div class="official-cell" style="background:var(--bg-input);">ايراد الفترة الصباحية : ${formatNumber(report.morning?.inflow || 0)}</div>
         </div>
 
         <!-- EVENING SECTION -->
@@ -1282,7 +1282,7 @@ window.renderOfficialTable = function(report) {
         </div>
 
         <!-- TEACHER BOOKINGS -->
-        <div class="official-full-row" style="background:#fcebe1;">
+        <div class="official-full-row" style="background:var(--bg-input);">
             حجوزات خاصة لمدرس : ${report.teacherBookings || '-'}
         </div>
 
@@ -1320,14 +1320,14 @@ window.renderOfficialTable = function(report) {
         <!-- FOOTER -->
         <div class="official-header-red" style="background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%); border:none; color:#fff;">الغيابات والالغاءات</div>
         <div class="official-table-grid">
-             <div class="official-cell" style="background:#fdf5e6;">المدرس</div>
-             <div class="official-cell" style="background:#fdf5e6;">عدد المجموعات الملغاه</div>
-             <div class="official-cell" style="background:#fdf5e6;">سبب الالغاء</div>
+             <div class="official-cell" style="background:var(--bg-input);">المدرس</div>
+             <div class="official-cell" style="background:var(--bg-input);">عدد المجموعات الملغاه</div>
+             <div class="official-cell" style="background:var(--bg-input);">سبب الالغاء</div>
              
-             <div class="official-full-row" style="background:#fff; font-size:13px;">${report.cancellations || 'لا يوجد جروبات ملغيه علي مدار اليوم'}</div>
+             <div class="official-full-row" style="background:var(--bg-card); font-size:13px;">${report.cancellations || 'لا يوجد جروبات ملغيه علي مدار اليوم'}</div>
         </div>
         
-        <div class="official-cell" style="grid-column:span 3; background:#fdf5e6; border-top:none; border-bottom:3px solid #000; font-size:18px;">
+        <div class="official-cell" style="grid-column:span 3; background:var(--bg-input); border-top:none; border-bottom:3px solid var(--primary); font-size:18px;">
             كتابه التقرير : ${report.evening?.reportedBy || report.morning?.secretaries?.[0]?.name || '—'}
         </div>
     </div>
@@ -1531,12 +1531,15 @@ function renderReport(el, existingData = null) {
         </div>
         <div class="summary-grid">
             <div class="summary-box prev-balance-box" style="background:linear-gradient(135deg, rgba(243,156,18,0.2), rgba(230,126,34,0.1)); border:2px solid rgba(243,156,18,0.5); border-radius:16px; box-shadow:0 0 20px rgba(243,156,18,0.15); position:relative;">
-                <span class="label" style="color:#ffd93d; font-weight:700;">✏️ الرصيد السابق (المتبقي من أمس)</span>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding: 0 10px;">
+                    <span class="label" style="color:#ffd93d; font-weight:700; margin-bottom:0;">✏️ الرصيد السابق (المتبقي من أمس)</span>
+                    <button type="button" onclick="syncPreviousBalance()" style="background:rgba(255,217,61,0.2); border:1px solid #ffd93d; color:#ffd93d; border-radius:6px; padding:4px 8px; cursor:pointer; font-size:12px; font-weight:bold; transition:all 0.2s;" title="جلب الرصيد من التقرير السابق مباشرة">🔄 مزامنة</button>
+                </div>
                 <input type="text" inputmode="decimal" id="previousBalance" placeholder="اكتب المبلغ هنا..." 
                        oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); calculateGlobalBalance();" 
-                       style="width: 100%; border: none; background: transparent; text-align: center; font-size: 28px; font-weight: 900; color: #ffd93d; outline: none; cursor:text;" 
+                       style="width: 100%; border: none; background: transparent; text-align: center; font-size: 28px; font-weight: 900; color: #ffd93d; outline: none; cursor:text; margin-top:8px;" 
                        value="${financials.previousBalance || ''}">
-                <div style="text-align:center; font-size:11px; color:rgba(255,217,61,0.5); margin-top:4px;">⬆ اضغط هنا للإدخال</div>
+                <div style="text-align:center; font-size:11px; color:rgba(255,217,61,0.5); margin-top:4px;">⬆ اضغط هنا للإدخال أو استخدم زر المزامنة 🔄</div>
             </div>
             <div class="summary-box inflow-box" style="background:rgba(39,174,96,0.15); border:1px solid rgba(39,174,96,0.3);">
                 <span class="label" style="color:#2ecc71;">إجمالي الوارد (محسوب)</span>
@@ -1837,6 +1840,32 @@ window.fetchLastBalance = function(branchKey) {
                 showToast(`تم سحب رصيد ${formatNumber(lastBalance)} ج.م من تقرير ${lastReport.date} تلقائياً`, 'success');
             }
         }
+    }
+};
+
+// Sync Previous Balance manually to specific active date
+window.syncPreviousBalance = function() {
+    const branchSelect = document.getElementById('branchSelect2');
+    const branchKey = branchSelect ? branchSelect.value : (AppState.userBranch || AppState.currentBranch || 'soyouf');
+    const activeDate = document.getElementById('reportDate')?.value || today();
+    
+    // Check past reports for this specific date chronologically
+    const pastReports = AppState.reports
+        .filter(r => r.branch === branchKey && r.date < activeDate)
+        .sort((a, b) => b.date.localeCompare(a.date));
+    
+    if (pastReports.length > 0) {
+        const lastReport = pastReports[0];
+        const lastBalance = lastReport.currentBalance || lastReport.financials?.totalNet || 0;
+        
+        const prevInput = document.getElementById('previousBalance');
+        if (prevInput) {
+            prevInput.value = lastBalance;
+            calculateGlobalBalance();
+            showToast(`تم جلب الرصيد المرحل ${formatNumber(lastBalance)} ج.م من آخر تقرير بتاريخ (${lastReport.date})`, 'success');
+        }
+    } else {
+        showToast('لا يوجد تقرير سابق لليوم المحدد لسحب الرصيد منه، يرجى الإدخال يدوياً', 'warning');
     }
 };
 
@@ -2186,7 +2215,7 @@ function renderFinance(el) {
         <div class="section-card-body table-wrapper">
             <table>
                 <thead>
-                    <tr><th>التاريخ</th><th>الفرع</th><th>الإيراد</th><th>المصروف</th><th>الصافي</th><th>الرصيد النهائي</th></tr>
+                    <tr><th>التاريخ</th><th>الفرع</th><th>الإيراد</th><th>المصروف</th><th>الصافي</th><th>الرصيد النهائي</th><th>إجراءات</th></tr>
                 </thead>
                 <tbody>
                     ${reports.length > 0 ? reports.map(r => `
@@ -2197,7 +2226,11 @@ function renderFinance(el) {
                         <td class="amount-cell expense">${formatNumber(r.financials?.dailyOutflow || 0)}</td>
                         <td class="amount-cell" style="color:var(--primary)">${formatNumber((r.financials?.dailyInflow || 0) - (r.financials?.dailyOutflow || 0))}</td>
                         <td><strong>${formatNumber(r.currentBalance || 0)}</strong></td>
-                    </tr>`).reverse().join('') : `<tr><td colspan="6"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد تقارير</p></div></td></tr>`}
+                        <td>
+                            <button class="btn btn-outline" style="padding:4px 8px;font-size:12px;" onclick="editReport('${r.id}')">✏️ تعديل</button>
+                            <button class="btn-remove" onclick="deleteReport('${r.id}')">🗑️</button>
+                        </td>
+                    </tr>`).reverse().join('') : `<tr><td colspan="7"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد تقارير</p></div></td></tr>`}
                 </tbody>
             </table>
         </div>
@@ -2209,6 +2242,34 @@ function renderFinance(el) {
         setTimeout(() => animateCount(el, target), 200);
     });
 }
+
+window.editReport = function(id) {
+    const report = AppState.reports.find(r => r.id === id);
+    if (!report) return;
+    
+    AppState.currentBranch = report.branch;
+    navigate('report');
+    
+    setTimeout(() => {
+        const dateInput = document.getElementById('reportDate');
+        const branchInput = document.getElementById('branchSelect2');
+        if (dateInput) dateInput.value = report.date;
+        if (branchInput) branchInput.value = report.branch;
+        
+        if (window.reloadReportByDate) {
+            window.reloadReportByDate();
+        }
+    }, 50);
+};
+
+window.deleteReport = function(id) {
+    if (!confirm('⚠️ تحذير: هل أنت متأكد من حذف هذا التقرير نهائياً؟')) return;
+    
+    AppState.reports = AppState.reports.filter(r => r.id !== id);
+    saveData();
+    showToast('تم حذف التقرير بنجاح', 'error');
+    navigate('finance');
+};
 
 // -------------------------
 // Page: Daily Budget
@@ -3143,6 +3204,13 @@ function saveLedgerEntry(key) {
         console.warn("⏳ Sync Pending or offline - local save only.");
     }
 }
+
+window.isLedgerActive = function(key) {
+    const l = AppState.ledgers[key];
+    if (!l) return false;
+    if (parseFloat(l.previousBalance) > 0) return true;
+    return l.rows.some(r => parseFloat(r.value) > 0 || parseFloat(r.expense) > 0);
+};
 
 window.calculateLedgerInflow = function(key) {
     const l = AppState.ledgers[key];

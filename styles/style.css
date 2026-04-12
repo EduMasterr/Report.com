@@ -525,7 +525,7 @@ body {
     line-height: 1.1;
     text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-.summary-card.red .card-value { color: var(--primary); }
+.summary-card.red .card-value, .summary-card.red .card-label, .summary-card.red .card-unit { color: #ffffff !important; }
 .summary-card.gold .card-value { color: #c9a227; }
 .summary-card.green .card-value { color: #27ae60; }
 .summary-card.blue .card-value { color: #2980b9; }
@@ -2102,8 +2102,8 @@ label[for="eveningSecretariesList"] {
 .official-stat-row:nth-child(even) { background: #fdf5e6; }
 .official-stat-row:last-child { border-bottom: none; }
 
-.official-stat-label { color: #000; }
-.official-stat-value { color: #000 !important; font-weight: 950; }
+.official-stat-label { color: var(--text-primary); }
+.official-stat-value { color: var(--text-primary) !important; font-weight: 950; }
 
 .official-card-footer {
     padding: 12px;
