@@ -234,7 +234,10 @@ function deduplicateReports(reports) {
     const map = new Map();
     reports.forEach(r => {
         if (!r || !r.branch || !r.date) return;
-        const key = `${r.branch}_${r.date}`;
+        // Normalize Key to prevent duplicates from whitespace or case differences
+        const branchKey = String(r.branch).trim().toLowerCase();
+        const dateKey = String(r.date).trim();
+        const key = `${branchKey}_${dateKey}`;
         
         if (map.has(key)) {
             const existing = map.get(key);
