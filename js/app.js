@@ -135,6 +135,8 @@ window.syncWithCloud = function() {
                     syncBtn.classList.add('synced-pulse');
                     setTimeout(() => syncBtn.innerHTML = '🔄 تحديث البيانات سحابياً', 3000);
                 }
+                // REFRESH UI to remove standard load shield
+                if (AppState.currentPage) navigate(AppState.currentPage);
             }
 
             if (AppState.currentPage === 'dailybudget') renderDailyBudget(document.getElementById('pageContent'));
@@ -142,7 +144,11 @@ window.syncWithCloud = function() {
             // Removal of automatic report re-render to prevent UI freezing during sync
         } else {
             // Even if empty, connection established
-            AppState.isInitialSyncComplete = true;
+            if (!AppState.isInitialSyncComplete) {
+                AppState.isInitialSyncComplete = true;
+                // REFRESH UI to remove standard load shield
+                if (AppState.currentPage) navigate(AppState.currentPage);
+            }
         }
     });
 
