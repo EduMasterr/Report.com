@@ -2514,6 +2514,7 @@ function renderAdmin(el) {
     <div class="page-header animate-in">
         <h1>⚙️ الأدمن إديتور</h1>
         <p>إدارة الفروع والموظفين — إضافة وتعديل وحذف</p>
+        <button class="btn" style="background:#d63031; color:#fff; margin-top:10px; padding:8px 15px; border-radius:8px; font-size:12px;" onclick="performNuclearReset()">⚠️ ضبط مصنع السحاب (مسح التقارير)</button>
     </div>
 
     <!-- ====== SYSTEM SETTINGS ====== -->
@@ -2667,6 +2668,18 @@ function renderAdmin(el) {
     renderAdminBranchList();
     renderAdminEmployeeList();
     updateFolderStatusUI();
+}
+
+window.performNuclearReset = function() {
+    if (confirm("⚠️ تحذير: سيتم مسح كافة التقارير والحسابات فوراً من السحاب.\nهل أنت متأكد؟")) {
+        const secret = AppState.systemSecret;
+        db.ref(secret + '/bms/reports').set(null);
+        db.ref(secret + '/bms/ledgers').set(null);
+        db.ref(secret + '/bms/budgets').set(null);
+        db.ref(secret + '/bms/expenses').set(null);
+        showToast('تم تصفير البيانات بنجاح 🧼');
+        setTimeout(() => location.reload(), 1500);
+    }
 }
 
 async function updateFolderStatusUI() {
