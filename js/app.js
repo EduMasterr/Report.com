@@ -118,6 +118,8 @@ window.syncWithCloud = function() {
             localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
             console.log("✅ Ledgers synced");
             if (AppState.currentPage === 'dailybudget') renderDailyBudget(document.getElementById('pageContent'));
+            if (AppState.currentPage === 'dashboard') renderDashboard(document.getElementById('pageContent'));
+            if (AppState.currentPage === 'report') renderReport(document.getElementById('pageContent'), null);
         }
     });
 
@@ -598,11 +600,13 @@ window.forceSyncData = async function() {
         const snap = await db.ref(AppState.systemSecret + '/bms').once('value');
         if (snap.exists()) {
             const data = snap.val();
-            if (data.reports) AppState.reports = data.reports;
+            
+            // Core Data Sync with Array Correction
+            if (data.reports) AppState.reports = Array.isArray(data.reports) ? data.reports : Object.values(data.reports);
             if (data.ledgers) AppState.ledgers = data.ledgers;
-            if (data.budgets) AppState.budgets = data.budgets;
+            if (data.budgets) AppState.budgets = Array.isArray(data.budgets) ? data.budgets : Object.values(data.budgets);
             if (data.branches) BRANCHES = data.branches;
-            if (data.employees) EMPLOYEES = data.employees;
+            if (data.employees) EMPLOYEES = Array.isArray(data.employees) ? data.employees : Object.values(data.employees);
             
             // Save to local storage
             localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
@@ -612,7 +616,7 @@ window.forceSyncData = async function() {
             
             showToast('تم تحديث البيانات من السحابة بنجاح ✅', 'success');
             
-            // Refresh current page
+            // Force Full UI Refresh
             navigate(AppState.currentPage);
         }
     } catch (err) {
@@ -1268,12 +1272,20 @@ window.updateManagerName = function() {
 // Page: Daily Report Form
 // -------------------------
 function renderReport(el, existingData = null) {
+    // Current bKey logic moved inside for dynamic updating
+    const getReportContext = () => {
+        const branchSelect = document.getElementById('branchSelect2');
+        const bKey = branchSelect ? branchSelect.value : (AppState.userBranch || AppState.currentBranch || 'soyouf');
+        const reportDate = document.getElementById('reportDate')?.value || today();
+        return { bKey, reportDate };
+    };
+
     // Auto-detect existing report for today if none passed
     if (!existingData) {
-        const branchKey = AppState.userBranch || 'soyouf';
-        const todayDate = today();
-        existingData = AppState.reports.find(r => r.branch === branchKey && r.date === todayDate) || null;
+        const ctx = getReportContext();
+        existingData = AppState.reports.find(r => r.branch === ctx.bKey && r.date === ctx.reportDate) || null;
     }
+    const bKey = existingData?.branch || AppState.userBranch || AppState.currentBranch || 'soyouf';
     const data = existingData || {};
     const morning = data.morning || {};
     const evening = data.evening || {};
@@ -1542,10 +1554,16 @@ function renderReport(el, existingData = null) {
         fetchLastBalance(bKey);
     }
 
-    // Sync checklists if branch changes
+    // Sync checklists and handle dynamic re-fetching for branch/date changes
     const bSel = document.getElementById('branchSelect2');
     if (bSel) {
-        bSel.addEventListener('change', (e) => updateSecretaryLists(e.target.value));
+        bSel.addEventListener('change', (e) => {
+            const newBranch = e.target.value;
+            const targetDate = document.getElementById('reportDate').value;
+            // Check if we have a report for this new combination
+            const existing = AppState.reports.find(r => r.branch === newBranch && r.date === targetDate);
+            renderReport(el, existing); // Re-render with new data
+        });
     }
 }
 
