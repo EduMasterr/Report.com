@@ -589,9 +589,36 @@ function fallbackDownload(payload, fileName) {
     showToast('تم الحفظ في مسار التنزيلات الافتراضي', 'success');
 }
 
-window.forceSyncData = function() {
-    saveData();
-    showToast('تم مزامنة وحفظ البيانات بنجاح 🔄');
+window.forceSyncData = async function() {
+    if (!window.db) return showToast('تعذر الاتصال بقاعدة البيانات', 'error');
+    
+    showToast('جاري سحب البيانات من السحابة... ⏳');
+    
+    try {
+        const snap = await db.ref(AppState.systemSecret + '/bms').once('value');
+        if (snap.exists()) {
+            const data = snap.val();
+            if (data.reports) AppState.reports = data.reports;
+            if (data.ledgers) AppState.ledgers = data.ledgers;
+            if (data.budgets) AppState.budgets = data.budgets;
+            if (data.branches) BRANCHES = data.branches;
+            if (data.employees) EMPLOYEES = data.employees;
+            
+            // Save to local storage
+            localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
+            localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
+            localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
+            localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
+            
+            showToast('تم تحديث البيانات من السحابة بنجاح ✅', 'success');
+            
+            // Refresh current page
+            navigate(AppState.currentPage);
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('فشل في سحب البيانات', 'error');
+    }
 };
 
 window.logout = function() {
@@ -824,9 +851,14 @@ function renderDashboard(el) {
         : `<span class="badge badge-success" style="font-size:12px;">🏢 ${BRANCHES[AppState.userBranch]?.name || ''}</span>`;
 
     el.innerHTML = `
-    <div class="page-header animate-in">
-        <h1>مرحباً بك 👋</h1>
-        <p>${isDev ? 'نظرة عامة كاملة على النظام' : 'بيانات فرعك الحالي'}</p>
+    <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <h1>مرحباً بك 👋</h1>
+            <p>${isDev ? 'نظرة عامة كاملة على النظام' : 'بيانات فرعك الحالي'}</p>
+        </div>
+        <button class="official-btn refresh-btn" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
+            🔄 تحديث البيانات سحابياً
+        </button>
     </div>
 
     <div class="official-summary-banner animate-in">
@@ -1018,6 +1050,10 @@ function renderManagerDashboard(el) {
             <h1>مرحباً ${AppState.managerName} 👋</h1>
             <p>استعراض التقارير اليومية للفروع</p>
         </div>
+        <button class="official-btn refresh-btn" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
+            🔄 تحديث البيانات سحابياً
+        </button>
+    </div>
     ${summaryBannerHTML}
     ${branchesGridHTML}
 
