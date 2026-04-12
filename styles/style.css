@@ -396,9 +396,7 @@ body {
     border: 2px solid #3498db;
 }
 .branch-selector select option {
-    background: #001f3f;
-    color: white;
-    font-weight: 700;
+    font-weight: 900;
 }
 .branch-selector select:focus { border-color: var(--primary); }
 
@@ -525,7 +523,7 @@ body {
     line-height: 1.1;
     text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-.summary-card.red .card-value { color: var(--primary); }
+.summary-card.red .card-value, .summary-card.red .card-label, .summary-card.red .card-unit { color: #ffffff !important; }
 .summary-card.gold .card-value { color: #c9a227; }
 .summary-card.green .card-value { color: #27ae60; }
 .summary-card.blue .card-value { color: #2980b9; }
@@ -551,7 +549,8 @@ body {
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-sm);
-    overflow: hidden;
+    /* Removed overflow:hidden to allow custom dropdowns to be visible */
+    position: relative;
     transition: var(--transition);
 }
 .section-card:hover { box-shadow: var(--shadow-md); }
@@ -848,7 +847,7 @@ label[for="eveningSecretariesList"] {
 
 .transaction-row {
     display: grid;
-    grid-template-columns: 1fr 75px 35px;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
     align-items: center;
     padding: 8px 15px;
@@ -1804,7 +1803,7 @@ label[for="eveningSecretariesList"] {
 
 .official-table-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr 1fr 1fr;
     border: none;
     margin-bottom: 2px;
 }
@@ -1906,7 +1905,7 @@ label[for="eveningSecretariesList"] {
 
 .financial-grid-headers {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr 1fr 1fr;
     background: #b20000;
     color: #fff;
     text-align: center;
@@ -2000,11 +1999,9 @@ label[for="eveningSecretariesList"] {
 }
 
 [data-theme="dark"] .official-report-container {
-    background: #fff !important;
-    color: #000 !important;
-}
-[data-theme="dark"] .official-report-container * {
-    color: inherit !important;
+    background: #111111 !important;
+    color: #ffffff !important;
+    border-color: #333 !important;
 }
 
 /* =============================================
@@ -2102,8 +2099,8 @@ label[for="eveningSecretariesList"] {
 .official-stat-row:nth-child(even) { background: #fdf5e6; }
 .official-stat-row:last-child { border-bottom: none; }
 
-.official-stat-label { color: #000; }
-.official-stat-value { color: #000 !important; font-weight: 950; }
+.official-stat-label { color: var(--text-primary); }
+.official-stat-value { color: var(--text-primary) !important; font-weight: 950; }
 
 .official-card-footer {
     padding: 12px;
@@ -2337,12 +2334,18 @@ label[for="eveningSecretariesList"] {
     border-color: rgba(255,255,255,0.06) !important;
 }
 
-[data-theme="dark"] .official-stat-row .stat-label {
-    color: rgba(255,255,255,0.6) !important;
+[data-theme="dark"] .official-stat-row:nth-child(even) {
+    background: rgba(255, 255, 255, 0.04) !important;
 }
 
-[data-theme="dark"] .official-stat-row .stat-value {
-    color: #fff !important;
+[data-theme="dark"] .official-stat-row .official-stat-label,
+[data-theme="dark"] .official-stat-label {
+    color: rgba(255,255,255,0.85) !important;
+}
+
+[data-theme="dark"] .official-stat-row .official-stat-value,
+[data-theme="dark"] .official-stat-value {
+    color: #ffffff !important;
 }
 
 /* Compact inputs for report fields as requested */
@@ -2363,14 +2366,14 @@ label[for="eveningSecretariesList"] {
    Premium Capsule-Based Layout
    ============================================= */
 .ledger-row-premium { 
-    display: flex !important;
-    flex-wrap: nowrap !important;
+    display: grid !important;
+    grid-template-columns: 50px 1fr 90px 90px 1fr 90px 1fr 1.2fr;
     gap: 10px !important;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    padding: 5px 0 !important;
-    margin-bottom: 12px !important;
+    padding: 2px 0 !important;
+    margin-bottom: 8px !important;
     align-items: center;
 }
 
@@ -2404,11 +2407,11 @@ label[for="eveningSecretariesList"] {
 }
 
 /* Sizing variant for capsules */
-.capsule-idx { width: 45px; height: 45px; flex-shrink: 0; background: var(--gradient-primary) !important; color: #fff !important; font-weight: 900; border: none !important; }
-.capsule-small { width: 90px; flex-shrink: 0; }
-.capsule-medium { width: 140px; flex-shrink: 0; }
-.capsule-large { width: 220px; flex-shrink: 0; }
-.capsule-wide { flex-grow: 1; min-width: 250px; }
+.capsule-idx { width: 100%; height: 45px; flex-shrink: 0; background: var(--gradient-primary) !important; color: #fff !important; font-weight: 900; border: none !important; }
+.capsule-small { width: 100%; flex-shrink: 0; }
+.capsule-medium { width: 100%; flex-shrink: 0; }
+.capsule-large { width: 100%; flex-shrink: 0; }
+.capsule-wide { width: 100%; }
 
 /* Color accents for inflow/outflow capsules */
 .inflow-accent { border-color: rgba(46, 204, 113, 0.4) !important; }
@@ -2416,12 +2419,76 @@ label[for="eveningSecretariesList"] {
 .outflow-accent { border-color: rgba(231, 76, 60, 0.4) !important; }
 .outflow-accent input { color: #e74c3c !important; }
 
-[data-theme="light"] .capsule-input {
-    border-color: #d1d8e0 !important;
-    box-shadow: 0 6px 15px rgba(0,0,0,0.08) !important;
+
+/* Custom Colored Dropdown - Mini Version (Clean Fix) */
+.custom-select-wrapper { 
+    position: relative; 
+    width: 200px; /* Slim width */
+    cursor: pointer; 
+    z-index: 1001; /* High priority for the whole component */
+}
+.custom-select-trigger {
+    background: #001f3f;
+    color: #fff;
+    padding: 6px 12px; 
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1.5px solid rgba(255,255,255,0.1);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+.custom-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #ffffff !important; /* Solid white for prominence */
+    border-radius: 8px;
+    overflow-y: auto;
+    max-height: 260px; 
+    scrollbar-width: thin;
+    display: none;
+    z-index: 999999 !important; /* Ultimate priority */
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5); /* Deep shadow for "On Top" feel */
+    border: 1px solid rgba(0,0,0,0.1);
+    padding: 4px;
+}
+[data-theme="dark"] .custom-options { 
+    background: #0b1a31 !important; /* Solid dark for prominence */
+    border-color: rgba(255,255,255,0.2);
+    scrollbar-color: rgba(255,255,255,0.3) transparent;
 }
 
-/* Animation for Table Inflow/Outflow Glow */
-#ledgerTotalInflow, #ledgerTotalOutflow { transition: all 0.5s ease; }
-#ledgerTotalInflow.updated { text-shadow: 0 0 15px #2ecc71; }
-#ledgerTotalOutflow.updated { text-shadow: 0 0 15px #e74c3c; }
+.custom-options.show { display: block; }
+
+.custom-option {
+    padding: 5px 10px;
+    color: var(--text-primary) !important;
+    font-weight: 600;
+    font-size: 11px;
+    transition: all 0.2s;
+    border-radius: 6px;
+    margin-bottom: 2px;
+    cursor: pointer;
+}
+[data-theme="dark"] .custom-option { color: #fff !important; }
+.custom-option:last-child { margin-bottom: 0; }
+.custom-option:hover { 
+    background: var(--primary) !important;
+    color: #fff !important;
+    padding-right: 14px;
+}
+
+/* Custom Scrollbar for Dropdown */
+.custom-options::-webkit-scrollbar { width: 4px; }
+.custom-options::-webkit-scrollbar-track { background: transparent; }
+.custom-options::-webkit-scrollbar-thumb { 
+    background: rgba(0,0,0,0.3); 
+    border-radius: 10px; 
+}
+[data-theme="dark"] .custom-options::-webkit-scrollbar-thumb { 
+    background: rgba(255,255,255,0.4); /* Brighter thumb for visibility */
+}

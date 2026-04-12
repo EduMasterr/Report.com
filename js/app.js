@@ -18,7 +18,8 @@ const AppState = {
     masterPassword: localStorage.getItem('bms_master_pass') || 'admin#135',
     backupPath: localStorage.getItem('bms_backup_path') || 'D:\\\\Backups-Report',
     ledgers: JSON.parse(localStorage.getItem('bms_ledgers') || '{}'), 
-    systemSecret: 'ReportV2_SecurePath_882' // Dynamic path for cloud data
+    systemSecret: 'ReportV2_SecurePath_882', // Dynamic path for cloud data
+    isInitialSyncComplete: false // Nitro-Block Protection
 };
 
 // Default data (used for seeding if no localStorage)
@@ -124,9 +125,30 @@ window.syncWithCloud = function() {
             AppState.ledgers = snap.val();
             localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
             console.log("✅ Ledgers synced");
+            
+            // Mark sync as complete on first data arrival
+            if (!AppState.isInitialSyncComplete) {
+                AppState.isInitialSyncComplete = true;
+                const syncBtn = document.querySelector('.refresh-btn');
+                if (syncBtn) {
+                    syncBtn.innerHTML = '✅ تمت المزامنة';
+                    syncBtn.classList.add('synced-pulse');
+                    setTimeout(() => syncBtn.innerHTML = '🔄 تحديث البيانات سحابياً', 3000);
+                }
+                // REFRESH UI to remove standard load shield
+                if (AppState.currentPage) navigate(AppState.currentPage);
+            }
+
             if (AppState.currentPage === 'dailybudget') renderDailyBudget(document.getElementById('pageContent'));
             if (AppState.currentPage === 'dashboard') renderDashboard(document.getElementById('pageContent'));
             // Removal of automatic report re-render to prevent UI freezing during sync
+        } else {
+            // Even if empty, connection established
+            if (!AppState.isInitialSyncComplete) {
+                AppState.isInitialSyncComplete = true;
+                // REFRESH UI to remove standard load shield
+                if (AppState.currentPage) navigate(AppState.currentPage);
+            }
         }
     });
 
@@ -152,18 +174,34 @@ window.syncWithCloud = function() {
 
 
 function saveData() {
+    // 1. Update Local Storage
     localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
     localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
     localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
     localStorage.setItem('bms_budgets', JSON.stringify(AppState.budgets));
     localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
     
+    // 2. NITRO-BLOCK: Safety check before pushing to cloud
     if (window.db) {
-        db.ref(AppState.systemSecret + '/bms/reports').set(AppState.reports || []);
-        db.ref(AppState.systemSecret + '/bms/branches').set(BRANCHES || {});
-        db.ref(AppState.systemSecret + '/bms/employees').set(EMPLOYEES || []);
-        db.ref(AppState.systemSecret + '/bms/budgets').set(AppState.budgets || []);
-        db.ref(AppState.systemSecret + '/bms/ledgers').set(AppState.ledgers || {});
+        if (!AppState.isInitialSyncComplete) {
+            console.warn("🛑 Prevented Cloud Overwrite: Sync not yet finished.");
+            return; // Exit to prevent wiping cloud with empty local state
+        }
+
+        // Use ATOMIC UPDATES to prevent deleting other branches' data
+        const updates = {};
+        updates['/reports'] = AppState.reports || [];
+        updates['/branches'] = BRANCHES || {};
+        updates['/employees'] = EMPLOYEES || [];
+        updates['/budgets'] = AppState.budgets || [];
+        
+        // Specially update ledgers to MERGE branch entries
+        db.ref(AppState.systemSecret + '/bms/ledgers').update(AppState.ledgers || {});
+        
+        // Push bulk updates for other categories
+        db.ref(AppState.systemSecret + '/bms').update(updates);
+        
+        console.log("☁️ Nitro-Sync: Cloud updated atomically.");
     }
 }
 
@@ -601,7 +639,7 @@ function fallbackDownload(payload, fileName) {
 window.forceSyncData = async function() {
     if (!window.db) return showToast('تعذر الاتصال بقاعدة البيانات', 'error');
     
-    showToast('جاري سحب البيانات من السحابة... ⏳');
+    showToast('جاري سحب البيانات العميقة من السحابة... ⏳');
     
     try {
         const snap = await db.ref(AppState.systemSecret + '/bms').once('value');
@@ -620,6 +658,9 @@ window.forceSyncData = async function() {
             localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
             localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
             localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
+            
+            // Update Nitro Flag
+            AppState.isInitialSyncComplete = true;
             
             showToast('تم تحديث البيانات من السحابة بنجاح ✅', 'success');
             
@@ -754,6 +795,35 @@ function navigate(page) {
 }
 
 // -------------------------
+window.handleTopbarBranchChange = function(val) {
+    AppState.currentBranch = val;
+    if (AppState.userRole) navigate(AppState.currentPage);
+};
+
+window.handleFilterBranchChange = function(val) {
+    // This is handled by selectCustomOption setting the data-value
+};
+
+function renderCustomBranchSelect(id, initialVal, callbackName) {
+    const branchList = (typeof BRANCHES !== 'undefined' && BRANCHES) ? BRANCHES : DEFAULT_BRANCHES;
+    const currentBranch = branchList[initialVal] || { name: 'جميع الفروع (تقرير مجمع)' };
+    const label = (initialVal === 'all') ? 'جميع الفروع (تقرير مجمع)' : currentBranch.name;
+
+    return `
+    <div class="custom-select-wrapper" id="${id}-wrapper" style="width:100%; min-width:220px;">
+        <div class="custom-select-trigger" id="${id}-trigger" data-value="${initialVal}" style="background:#001f3f;" onclick="toggleCustomSelect('${id}')">
+            <span id="${id}-text">${label}</span>
+            <span class="chevron">▼</span>
+        </div>
+        <div class="custom-options" id="${id}-options">
+            <div class="custom-option" onclick="selectCustomOption('${id}','all','جميع الفروع (تقرير مجمع)','#001f3f','${callbackName}')">جميع الفروع (تقرير مجمع)</div>
+            ${Object.entries(branchList).map(([k,v]) => `
+                <div class="custom-option" onclick="selectCustomOption('${id}','${k}','${v.name}','#001f3f','${callbackName}')">${v.name}</div>
+            `).join('')}
+        </div>
+    </div>`;
+}
+
 // Page: Dashboard
 // -------------------------
 function renderDashboard(el) {
@@ -797,7 +867,7 @@ function renderDashboard(el) {
 
     if (isBranch) {
         const lKey = `${AppState.userBranch}_${tDate}`;
-        if (AppState.ledgers[lKey]) {
+        if (isLedgerActive(lKey)) {
             totalRevenue = calculateLedgerInflow(lKey);
             totalExpenses = calculateLedgerOutflow(lKey);
             currentBalance = calculateLedgerEndBalance(lKey);
@@ -818,7 +888,7 @@ function renderDashboard(el) {
         // Manager/Dev "Total" for all branches today
         Object.keys(BRANCHES).forEach(bKey => {
             const lKey = `${bKey}_${tDate}`;
-            if (AppState.ledgers[lKey]) {
+            if (isLedgerActive(lKey)) {
                 totalRevenue += calculateLedgerInflow(lKey);
                 totalExpenses += calculateLedgerOutflow(lKey);
                 currentBalance += calculateLedgerEndBalance(lKey);
@@ -850,7 +920,7 @@ function renderDashboard(el) {
         // Today's details for the card
         const lKey = `${key}_${tDate}`;
         let tRev = 0, tExp = 0, tBal = 0;
-        if (AppState.ledgers[lKey]) {
+        if (isLedgerActive(lKey)) {
             tRev = calculateLedgerInflow(lKey);
             tExp = calculateLedgerOutflow(lKey);
             tBal = calculateLedgerEndBalance(lKey);
@@ -873,13 +943,22 @@ function renderDashboard(el) {
         : `<span class="badge badge-success" style="font-size:12px;">🏢 ${BRANCHES[AppState.userBranch]?.name || ''}</span>`;
 
     el.innerHTML = `
+    ${!AppState.isInitialSyncComplete ? `
+    <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.7); backdrop-filter:blur(10px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:Cairo;">
+        <div class="loader-nitro" style="width:60px; height:60px; border:4px solid #f3f3f3; border-top:4px solid var(--primary); border-radius:50%; animation: spin 1s linear infinite; margin-bottom:20px;"></div>
+        <h2 style="color:var(--primary); font-weight:900;">Nitro-Sync: جاري جلب البيانات...</h2>
+        <p style="color:var(--text-secondary); margin-top:10px;">يرجى الانتظار ثوانٍ للتأكد من مزامنة آخر تقارير الفروع</p>
+    </div>
+    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+    ` : ''}
+
     <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center;">
         <div>
             <h1>مرحباً بك 👋</h1>
             <p>${isDev ? 'نظرة عامة كاملة على النظام' : 'بيانات فرعك الحالي'}</p>
         </div>
-        <button class="official-btn refresh-btn" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
-            🔄 تحديث البيانات سحابياً
+        <button class="official-btn refresh-btn ${AppState.isInitialSyncComplete ? 'synced' : ''}" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
+            ${AppState.isInitialSyncComplete ? '✅ تمت المزامنة' : '🔄 تحديث البيانات سحابياً'}
         </button>
     </div>
 
@@ -934,9 +1013,9 @@ function renderDashboard(el) {
                     <span class="official-stat-label">الاتصالات / الحجوزات</span>
                     <span class="official-stat-value">${bd.bCalls} / ${bd.bBookings}</span>
                 </div>
-                <div class="official-stat-row" style="background:#fdf5e6; border-top:1px solid #000;">
-                    <span class="official-stat-label">الرصيد الفعلي الحالي</span>
-                    <span class="official-stat-value" style="color:#b20000 !important;">${formatNumber(bd.tBal || 0)} ج.م</span>
+                <div class="official-stat-row" style="background: rgba(231, 76, 60, 0.08); border-top: 2px solid #e74c3c;">
+                    <span class="official-stat-label" style="font-weight: 900; color: #e74c3c;">الرصيد الفعلي الحالي</span>
+                    <span class="official-stat-value" style="color: #c0392b !important; font-size: 18px; font-weight: 950; text-shadow: 0 1px 2px rgba(0,0,0,0.05);">${formatNumber(bd.tBal || 0)} ج.م</span>
                 </div>
             </div>
             ${isBranch ? `
@@ -994,7 +1073,7 @@ function renderManagerDashboard(el) {
 
     branchData.forEach(bd => {
         const lKey = `${bd.key}_${tDate}`;
-        if (AppState.ledgers[lKey]) {
+        if (isLedgerActive(lKey)) {
             bd.tRev = calculateLedgerInflow(lKey);
             bd.tExp = calculateLedgerOutflow(lKey);
             bd.tBal = calculateLedgerEndBalance(lKey);
@@ -1058,28 +1137,37 @@ function renderManagerDashboard(el) {
                     <span class="official-stat-label">السكرتارية المختصة</span>
                     <span class="official-stat-value" style="font-size:13px;">${bd.bSecretaries.map(s => s.name).join(' · ') || '—'}</span>
                 </div>
-                <div class="official-stat-row" style="background:#fdf5e6; border-top: 1px solid #000;">
-                    <span class="official-stat-label">الرصيد الفعلي الحالي</span>
-                    <span class="official-stat-value" style="color:#b20000 !important;">${formatNumber(bd.tBal)} ج.م</span>
+                <div class="official-stat-row" style="background: rgba(231, 76, 60, 0.08); border-top: 2px solid #e74c3c;">
+                    <span class="official-stat-label" style="font-weight: 900; color: #e74c3c;">الرصيد الفعلي الحالي</span>
+                    <span class="official-stat-value" style="color: #c0392b !important; font-size: 18px; font-weight: 950; text-shadow: 0 1px 2px rgba(0,0,0,0.05);">${formatNumber(bd.tBal)} ج.م</span>
                 </div>
             </div>
         </div>`).join('')}
     </div>`;
 
     el.innerHTML = `
+    ${!AppState.isInitialSyncComplete ? `
+    <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.7); backdrop-filter:blur(10px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:Cairo;">
+        <div class="loader-nitro" style="width:60px; height:60px; border:4px solid #f3f3f3; border-top:4px solid var(--primary); border-radius:50%; animation: spin 1s linear infinite; margin-bottom:20px;"></div>
+        <h2 style="color:var(--primary); font-weight:900;">Nitro-Sync: جاري جلب البيانات...</h2>
+        <p style="color:var(--text-secondary); margin-top:10px;">يرجى الانتظار ثوانٍ للتأكد من مزامنة آخر تقارير الفروع</p>
+    </div>
+    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+    ` : ''}
+
     <div class="page-header animate-in" style="display:flex;align-items:center;justify-content:space-between;">
         <div>
             <h1>مرحباً ${AppState.managerName} 👋</h1>
             <p>استعراض التقارير اليومية للفروع</p>
         </div>
-        <button class="official-btn refresh-btn" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
-            🔄 تحديث البيانات سحابياً
+        <button class="official-btn refresh-btn ${AppState.isInitialSyncComplete ? 'synced' : ''}" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
+            ${AppState.isInitialSyncComplete ? '✅ تمت المزامنة' : '🔄 تحديث البيانات سحابياً'}
         </button>
     </div>
     ${summaryBannerHTML}
     ${branchesGridHTML}
 
-    <div class="section-card animate-in">
+    <div class="section-card animate-in" style="z-index: 200; position: relative;">
         <div class="section-card-header">
             <div class="header-icon morning">🔍</div>
             <h3>تصفية التقارير التفصيلية</h3>
@@ -1094,10 +1182,7 @@ function renderManagerDashboard(el) {
             </div>
             <div class="form-group">
                 <label>اختر الفرع</label>
-                <select id="mBranchFilter" class="form-input">
-                    <option value="all">جميع الفروع (تقرير مجمع)</option>
-                    ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('')}
-                </select>
+                ${renderCustomBranchSelect('mBranchFilter', 'all', 'handleFilterBranchChange')}
             </div>
             <button class="btn btn-primary" onclick="searchManagerReport()" style="padding:12px;">إظهار التقرير</button>
         </div>
@@ -1122,7 +1207,8 @@ window.resetManagerDate = function() {
 
 window.searchManagerReport = function() {
     const date = document.getElementById('mDateFilter').value;
-    const branchKey = document.getElementById('mBranchFilter').value;
+    const branchFilterTrigger = document.getElementById('mBranchFilter-trigger');
+    const branchKey = branchFilterTrigger ? branchFilterTrigger.dataset.value : 'all';
     const res = document.getElementById('mReportResult');
 
     const reports = (branchKey === 'all') 
@@ -1139,8 +1225,11 @@ window.searchManagerReport = function() {
     }
 
     if (branchKey === 'all') {
-        const totalRev = reports.reduce((s, r) => s + (r?.financials?.dailyInflow || 0), 0);
-        const totalExp = reports.reduce((s, r) => s + (r?.financials?.dailyOutflow || 0), 0);
+        const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
+        const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
+
+        const totalRev = reports.reduce((s, r) => s + getInc(r), 0);
+        const totalExp = reports.reduce((s, r) => s + getExp(r), 0);
         const totalBucks = reports.reduce((s, r) => s + (r?.morning?.bookings || 0) + (r?.evening?.bookings || 0), 0);
 
         res.innerHTML = `
@@ -1199,7 +1288,7 @@ window.renderOfficialTable = function(report) {
             <!-- Row 2: Stats -->
             <div class="official-cell">عدد الاتصالات : ${report.morning?.calls || 0}</div>
             <div class="official-cell">حجوزات الفتره الصباحيه : ${report.morning?.bookings || 0}</div>
-            <div class="official-cell" style="background:#fdf5e6;">ايراد الفترة الصباحية : ${formatNumber(report.morning?.inflow || 0)}</div>
+            <div class="official-cell" style="background:var(--bg-input);">ايراد الفترة الصباحية : ${formatNumber(report.morning?.inflow || 0)}</div>
         </div>
 
         <!-- EVENING SECTION -->
@@ -1223,7 +1312,7 @@ window.renderOfficialTable = function(report) {
         </div>
 
         <!-- TEACHER BOOKINGS -->
-        <div class="official-full-row" style="background:#fcebe1;">
+        <div class="official-full-row" style="background:var(--bg-input);">
             حجوزات خاصة لمدرس : ${report.teacherBookings || '-'}
         </div>
 
@@ -1261,14 +1350,14 @@ window.renderOfficialTable = function(report) {
         <!-- FOOTER -->
         <div class="official-header-red" style="background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%); border:none; color:#fff;">الغيابات والالغاءات</div>
         <div class="official-table-grid">
-             <div class="official-cell" style="background:#fdf5e6;">المدرس</div>
-             <div class="official-cell" style="background:#fdf5e6;">عدد المجموعات الملغاه</div>
-             <div class="official-cell" style="background:#fdf5e6;">سبب الالغاء</div>
+             <div class="official-cell" style="background:var(--bg-input);">المدرس</div>
+             <div class="official-cell" style="background:var(--bg-input);">عدد المجموعات الملغاه</div>
+             <div class="official-cell" style="background:var(--bg-input);">سبب الالغاء</div>
              
-             <div class="official-full-row" style="background:#fff; font-size:13px;">${report.cancellations || 'لا يوجد جروبات ملغيه علي مدار اليوم'}</div>
+             <div class="official-full-row" style="background:var(--bg-card); font-size:13px;">${report.cancellations || 'لا يوجد جروبات ملغيه علي مدار اليوم'}</div>
         </div>
         
-        <div class="official-cell" style="grid-column:span 3; background:#fdf5e6; border-top:none; border-bottom:3px solid #000; font-size:18px;">
+        <div class="official-cell" style="grid-column:span 3; background:var(--bg-input); border-top:none; border-bottom:3px solid var(--primary); font-size:18px;">
             كتابه التقرير : ${report.evening?.reportedBy || report.morning?.secretaries?.[0]?.name || '—'}
         </div>
     </div>
@@ -1472,12 +1561,15 @@ function renderReport(el, existingData = null) {
         </div>
         <div class="summary-grid">
             <div class="summary-box prev-balance-box" style="background:linear-gradient(135deg, rgba(243,156,18,0.2), rgba(230,126,34,0.1)); border:2px solid rgba(243,156,18,0.5); border-radius:16px; box-shadow:0 0 20px rgba(243,156,18,0.15); position:relative;">
-                <span class="label" style="color:#ffd93d; font-weight:700;">✏️ الرصيد السابق (المتبقي من أمس)</span>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding: 0 10px;">
+                    <span class="label" style="color:#ffd93d; font-weight:700; margin-bottom:0;">✏️ الرصيد السابق (المتبقي من أمس)</span>
+                    <button type="button" onclick="syncPreviousBalance()" style="background:rgba(255,217,61,0.2); border:1px solid #ffd93d; color:#ffd93d; border-radius:6px; padding:4px 8px; cursor:pointer; font-size:12px; font-weight:bold; transition:all 0.2s;" title="جلب الرصيد من التقرير السابق مباشرة">🔄 مزامنة</button>
+                </div>
                 <input type="text" inputmode="decimal" id="previousBalance" placeholder="اكتب المبلغ هنا..." 
                        oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); calculateGlobalBalance();" 
-                       style="width: 100%; border: none; background: transparent; text-align: center; font-size: 28px; font-weight: 900; color: #ffd93d; outline: none; cursor:text;" 
+                       style="width: 100%; border: none; background: transparent; text-align: center; font-size: 28px; font-weight: 900; color: #ffd93d; outline: none; cursor:text; margin-top:8px;" 
                        value="${financials.previousBalance || ''}">
-                <div style="text-align:center; font-size:11px; color:rgba(255,217,61,0.5); margin-top:4px;">⬆ اضغط هنا للإدخال</div>
+                <div style="text-align:center; font-size:11px; color:rgba(255,217,61,0.5); margin-top:4px;">⬆ اضغط هنا للإدخال أو استخدم زر المزامنة 🔄</div>
             </div>
             <div class="summary-box inflow-box" style="background:rgba(39,174,96,0.15); border:1px solid rgba(39,174,96,0.3);">
                 <span class="label" style="color:#2ecc71;">إجمالي الوارد (محسوب)</span>
@@ -1503,8 +1595,8 @@ function renderReport(el, existingData = null) {
 
     <!-- Submission and Actions -->
     <div class="form-actions animate-in" style="margin-top:40px; display:flex; flex-direction:column; align-items:center; gap:20px;">
-        <button class="btn btn-primary" onclick="saveReport()" style="padding:18px 80px; border-radius:100px; font-size:20px; font-weight:bold; box-shadow:0 10px 30px rgba(0,96,100,0.3); background:var(--gradient-primary); border:none; color:#fff;">
-            💾 ${existingData ? 'تحديث التقرير النهائي' : 'حفظ وإرسال التقرير'}
+        <button class="btn btn-primary" onclick="saveReport()" ${!AppState.isInitialSyncComplete ? 'disabled' : ''} style="padding:18px 80px; border-radius:100px; font-size:20px; font-weight:bold; box-shadow:0 10px 30px rgba(0,96,100,0.3); background:var(--gradient-primary); border:none; color:#fff; ${!AppState.isInitialSyncComplete ? 'opacity:0.5; cursor:not-allowed;' : ''}">
+            ${!AppState.isInitialSyncComplete ? '⏳ جاري المزامنة مع السحابة...' : `💾 ${existingData ? 'تحديث التقرير النهائي' : 'حفظ وإرسال التقرير'}`}
         </button>
         <button class="btn btn-outline" onclick="navigate('dashboard')" style="padding:12px 40px; border-radius:100px; border:1px solid var(--border-color); color:var(--text-secondary);">
             ↩ إلغاء والعودة للوحة التحكم
@@ -1781,6 +1873,32 @@ window.fetchLastBalance = function(branchKey) {
     }
 };
 
+// Sync Previous Balance manually to specific active date
+window.syncPreviousBalance = function() {
+    const branchSelect = document.getElementById('branchSelect2');
+    const branchKey = branchSelect ? branchSelect.value : (AppState.userBranch || AppState.currentBranch || 'soyouf');
+    const activeDate = document.getElementById('reportDate')?.value || today();
+    
+    // Check past reports for this specific date chronologically
+    const pastReports = AppState.reports
+        .filter(r => r.branch === branchKey && r.date < activeDate)
+        .sort((a, b) => b.date.localeCompare(a.date));
+    
+    if (pastReports.length > 0) {
+        const lastReport = pastReports[0];
+        const lastBalance = lastReport.currentBalance || lastReport.financials?.totalNet || 0;
+        
+        const prevInput = document.getElementById('previousBalance');
+        if (prevInput) {
+            prevInput.value = lastBalance;
+            calculateGlobalBalance();
+            showToast(`تم جلب الرصيد المرحل ${formatNumber(lastBalance)} ج.م من آخر تقرير بتاريخ (${lastReport.date})`, 'success');
+        }
+    } else {
+        showToast('لا يوجد تقرير سابق لليوم المحدد لسحب الرصيد منه، يرجى الإدخال يدوياً', 'warning');
+    }
+};
+
 // Reload report when date or branch is changed manually and "Refresh" is clicked
 window.reloadReportByDate = function(resetToToday = false) {
     const dateInput = document.getElementById('reportDate');
@@ -1886,10 +2004,29 @@ window.saveReport = function() {
         AppState.reports.push(report);
     }
     
-    saveData();
+    saveReportEntry(report);
     showToast('تم حفظ التقرير بنجاح!', 'success');
     setTimeout(() => navigate('dashboard'), 1000);
 };
+
+// New Atomic Report Sync Function
+function saveReportEntry(reportObject) {
+    // Determine the index to sync
+    const index = AppState.reports.findIndex(r => r.id === reportObject.id);
+    if (index === -1) return;
+    
+    // Update local storage
+    localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
+    
+    // Atomic Cloud Update
+    if (window.db && AppState.isInitialSyncComplete) {
+        // Send ONLY this specific report to its array index in Firebase to prevent overwriting others
+        db.ref(AppState.systemSecret + '/bms/reports/' + index).set(reportObject);
+        console.log(`☁️ Granular Sync: Report [${index}] updated.`);
+    } else {
+        console.warn("⏳ Sync Pending or offline - local save only.");
+    }
+}
 
 
 // -------------------------
@@ -2108,7 +2245,7 @@ function renderFinance(el) {
         <div class="section-card-body table-wrapper">
             <table>
                 <thead>
-                    <tr><th>التاريخ</th><th>الفرع</th><th>الإيراد</th><th>المصروف</th><th>الصافي</th><th>الرصيد النهائي</th></tr>
+                    <tr><th>التاريخ</th><th>الفرع</th><th>الإيراد</th><th>المصروف</th><th>الصافي</th><th>الرصيد النهائي</th><th>إجراءات</th></tr>
                 </thead>
                 <tbody>
                     ${reports.length > 0 ? reports.map(r => `
@@ -2119,7 +2256,11 @@ function renderFinance(el) {
                         <td class="amount-cell expense">${formatNumber(r.financials?.dailyOutflow || 0)}</td>
                         <td class="amount-cell" style="color:var(--primary)">${formatNumber((r.financials?.dailyInflow || 0) - (r.financials?.dailyOutflow || 0))}</td>
                         <td><strong>${formatNumber(r.currentBalance || 0)}</strong></td>
-                    </tr>`).reverse().join('') : `<tr><td colspan="6"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد تقارير</p></div></td></tr>`}
+                        <td>
+                            <button class="btn btn-outline" style="padding:4px 8px;font-size:12px;" onclick="editReport('${r.id}')">✏️ تعديل</button>
+                            <button class="btn-remove" onclick="deleteReport('${r.id}')">🗑️</button>
+                        </td>
+                    </tr>`).reverse().join('') : `<tr><td colspan="7"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد تقارير</p></div></td></tr>`}
                 </tbody>
             </table>
         </div>
@@ -2131,6 +2272,34 @@ function renderFinance(el) {
         setTimeout(() => animateCount(el, target), 200);
     });
 }
+
+window.editReport = function(id) {
+    const report = AppState.reports.find(r => r.id === id);
+    if (!report) return;
+    
+    AppState.currentBranch = report.branch;
+    navigate('report');
+    
+    setTimeout(() => {
+        const dateInput = document.getElementById('reportDate');
+        const branchInput = document.getElementById('branchSelect2');
+        if (dateInput) dateInput.value = report.date;
+        if (branchInput) branchInput.value = report.branch;
+        
+        if (window.reloadReportByDate) {
+            window.reloadReportByDate();
+        }
+    }, 50);
+};
+
+window.deleteReport = function(id) {
+    if (!confirm('⚠️ تحذير: هل أنت متأكد من حذف هذا التقرير نهائياً؟')) return;
+    
+    AppState.reports = AppState.reports.filter(r => r.id !== id);
+    saveData();
+    showToast('تم حذف التقرير بنجاح', 'error');
+    navigate('finance');
+};
 
 // -------------------------
 // Page: Daily Budget
@@ -2789,14 +2958,14 @@ window.renderDailyBudget = function(el) {
     </div>
 
         <!-- MODERN LEDGER TABLE HEADER -->
-        <div class="official-table-grid" style="grid-template-columns: 45px 2.2fr 95px 95px 1.5fr 95px 1fr 1.2fr; background: linear-gradient(135deg, #34495e, #2c3e50); color:#fff; font-weight:950; font-size:13px; text-align:center; border-radius:100px; margin-bottom:15px; padding:12px; box-shadow:0 8px 15px rgba(0,0,0,0.1);">
+        <div class="official-table-grid" style="grid-template-columns: 50px 1fr 90px 90px 1fr 90px 1fr 1.2fr; background: #2c3e50; color:#fff; font-weight:950; font-size:13px; text-align:center; border-radius:100px; margin-bottom:15px; padding:15px 0; box-shadow:0 8px 15px rgba(0,0,0,0.1); gap:10px;">
             <div>م</div>
-            <div>نوع الحجز والبيان</div>
+            <div>بيان الحجز</div>
             <div>الوارد (+)</div>
             <div>رقم الإيصال</div>
             <div>اسم العميل</div>
             <div>المنصرف (-)</div>
-            <div>نوع المنصرف</div>
+            <div>بيان المنصرف</div>
             <div>ملاحظات</div>
         </div>
 
@@ -2808,7 +2977,7 @@ window.renderDailyBudget = function(el) {
                 
                 <!-- Statement Capsule (Large) -->
                 <div class="capsule-input capsule-large">
-                    <input type="text" placeholder="نوع الحجز والبيان..." value="${row.bookingType||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'bookingType', this.value)">
+                    <input type="text" placeholder="بيان الحجز..." value="${row.bookingType||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'bookingType', this.value)">
                 </div>
 
                 <!-- Inflow Capsule (Small/Green) -->
@@ -2833,7 +3002,7 @@ window.renderDailyBudget = function(el) {
 
                 <!-- Exp Type Capsule (Medium) -->
                 <div class="capsule-input capsule-medium">
-                    <input type="text" placeholder="نوع المنصرف" value="${row.type||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'type', this.value)">
+                    <input type="text" placeholder="بيان المنصرف" value="${row.type||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'type', this.value)">
                 </div>
 
                 <!-- Notes Capsule (Medium) -->
@@ -2963,8 +3132,9 @@ window.changeLedgerBranch = function(val) {
 };
 
 window.updateLedgerMeta = function(key, field, val) {
+    if (!AppState.ledgers[key]) return;
     AppState.ledgers[key][field] = parseFloat(val) || 0;
-    saveData();
+    saveLedgerEntry(key);
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
@@ -2988,7 +3158,7 @@ window.updateLedgerPreviousBalance = function(key, val) {
         report.currentBalance = report.financials.totalNet;
     }
 
-    saveData();
+    saveLedgerEntry(key);
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
@@ -3027,9 +3197,10 @@ window.fetchLastLedgerBalance = function(branchKey, activeDate) {
 };
 
 window.updateLedgerRow = function(key, idx, field, val) {
+    if (!AppState.ledgers[key]) return;
     if (field === 'value' || field === 'expense') val = parseFloat(val) || 0;
     AppState.ledgers[key].rows[idx][field] = val;
-    saveData();
+    saveLedgerEntry(key);
     // Instant update
     document.getElementById('ledgerTotalInflow').textContent = formatNumber(calculateLedgerInflow(key));
     document.getElementById('ledgerTotalOutflow').textContent = formatNumber(calculateLedgerOutflow(key));
@@ -3037,14 +3208,38 @@ window.updateLedgerRow = function(key, idx, field, val) {
 };
 
 window.addLedgerRow = function(key) {
+    if (!AppState.ledgers[key]) return;
     AppState.ledgers[key].rows.push({ bookingType: '', value: 0, receiptNo: '', clientName: '', expense: 0, type: '', notes: '' });
-    saveData();
+    saveLedgerEntry(key);
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
 window.saveLedger = function(key) {
-    saveData();
+    saveLedgerEntry(key);
     showToast('تم حفظ اليومية بنجاح 💾', 'success');
+};
+
+// New Atomic Ledger Sync Function
+function saveLedgerEntry(key) {
+    if (!AppState.ledgers[key]) return;
+    
+    // Update local storage
+    localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
+    
+    // Atomic Cloud Update
+    if (window.db && AppState.isInitialSyncComplete) {
+        db.ref(AppState.systemSecret + '/bms/ledgers/' + key).set(AppState.ledgers[key]);
+        console.log(`☁️ Granular Sync: Ledger ${key} updated.`);
+    } else {
+        console.warn("⏳ Sync Pending or offline - local save only.");
+    }
+}
+
+window.isLedgerActive = function(key) {
+    const l = AppState.ledgers[key];
+    if (!l) return false;
+    if (parseFloat(l.previousBalance) > 0) return true;
+    return l.rows.some(r => parseFloat(r.value) > 0 || parseFloat(r.expense) > 0);
 };
 
 window.calculateLedgerInflow = function(key) {
@@ -3154,13 +3349,63 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.classList.remove('show');
     });
 
-    // Branch selector in topbar
-    document.getElementById('branchSelect')?.addEventListener('change', (e) => {
-        AppState.currentBranch = e.target.value;
-        if (AppState.userRole) {
-            navigate(AppState.currentPage);
+    // --- Modern Branch Selector Initialization ---
+    window.toggleCustomSelect = function(id) {
+        const wrapper = document.getElementById(id + '-wrapper');
+        const options = document.getElementById(id + '-options');
+        if (options) {
+            const isOpening = !options.classList.contains('show');
+            
+            // Close all others first
+            document.querySelectorAll('.custom-options').forEach(opt => {
+                opt.classList.remove('show');
+                const w = opt.parentElement;
+                if (w) w.style.zIndex = "";
+            });
+
+            if (isOpening) {
+                options.classList.add('show');
+                if (wrapper) wrapper.style.zIndex = "99999";
+            } else {
+                options.classList.remove('show');
+                if (wrapper) wrapper.style.zIndex = "";
+            }
+        }
+    };
+
+    window.selectCustomOption = function(id, val, name, color, callbackName) {
+        const trigger = document.getElementById(id + '-trigger');
+        const triggerText = document.getElementById(id + '-text');
+        const options = document.getElementById(id + '-options');
+        
+        if (trigger) trigger.style.background = color;
+        if (triggerText) triggerText.innerText = name;
+        if (options) options.classList.remove('show');
+        
+        const wrapper = document.getElementById(id + '-wrapper');
+        if (wrapper) wrapper.style.zIndex = "";
+
+        // Execute original logic
+        if (callbackName && typeof window[callbackName] === 'function') {
+            window[callbackName](val);
+        }
+    };
+
+    // Global listener to close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.custom-select-wrapper')) {
+            document.querySelectorAll('.custom-options').forEach(opt => {
+                opt.classList.remove('show');
+                const w = opt.parentElement;
+                if (w) w.style.zIndex = "";
+            });
         }
     });
+
+    function initCustomSelects() {
+        // Find existing branch selects and potentially replace them if needed, 
+        // but for now we'll rely on the renderManagerDashboard etc calling their own logic.
+    }
 
     // Keyboard Shortcuts
     document.addEventListener('keydown', (e) => {
