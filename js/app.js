@@ -18,7 +18,8 @@ const AppState = {
     masterPassword: localStorage.getItem('bms_master_pass') || 'admin#135',
     backupPath: localStorage.getItem('bms_backup_path') || 'D:\\\\Backups-Report',
     ledgers: JSON.parse(localStorage.getItem('bms_ledgers') || '{}'), 
-    systemSecret: 'ReportV2_SecurePath_882' // Dynamic path for cloud data
+    systemSecret: 'ReportV2_SecurePath_882', // Dynamic path for cloud data
+    isInitialSyncComplete: false // Nitro-Block Protection
 };
 
 // Default data (used for seeding if no localStorage)
@@ -124,9 +125,24 @@ window.syncWithCloud = function() {
             AppState.ledgers = snap.val();
             localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
             console.log("✅ Ledgers synced");
+            
+            // Mark sync as complete on first data arrival
+            if (!AppState.isInitialSyncComplete) {
+                AppState.isInitialSyncComplete = true;
+                const syncBtn = document.querySelector('.refresh-btn');
+                if (syncBtn) {
+                    syncBtn.innerHTML = '✅ تمت المزامنة';
+                    syncBtn.classList.add('synced-pulse');
+                    setTimeout(() => syncBtn.innerHTML = '🔄 تحديث البيانات سحابياً', 3000);
+                }
+            }
+
             if (AppState.currentPage === 'dailybudget') renderDailyBudget(document.getElementById('pageContent'));
             if (AppState.currentPage === 'dashboard') renderDashboard(document.getElementById('pageContent'));
             // Removal of automatic report re-render to prevent UI freezing during sync
+        } else {
+            // Even if empty, connection established
+            AppState.isInitialSyncComplete = true;
         }
     });
 
@@ -152,18 +168,34 @@ window.syncWithCloud = function() {
 
 
 function saveData() {
+    // 1. Update Local Storage
     localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
     localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
     localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
     localStorage.setItem('bms_budgets', JSON.stringify(AppState.budgets));
     localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
     
+    // 2. NITRO-BLOCK: Safety check before pushing to cloud
     if (window.db) {
-        db.ref(AppState.systemSecret + '/bms/reports').set(AppState.reports || []);
-        db.ref(AppState.systemSecret + '/bms/branches').set(BRANCHES || {});
-        db.ref(AppState.systemSecret + '/bms/employees').set(EMPLOYEES || []);
-        db.ref(AppState.systemSecret + '/bms/budgets').set(AppState.budgets || []);
-        db.ref(AppState.systemSecret + '/bms/ledgers').set(AppState.ledgers || {});
+        if (!AppState.isInitialSyncComplete) {
+            console.warn("🛑 Prevented Cloud Overwrite: Sync not yet finished.");
+            return; // Exit to prevent wiping cloud with empty local state
+        }
+
+        // Use ATOMIC UPDATES to prevent deleting other branches' data
+        const updates = {};
+        updates['/reports'] = AppState.reports || [];
+        updates['/branches'] = BRANCHES || {};
+        updates['/employees'] = EMPLOYEES || [];
+        updates['/budgets'] = AppState.budgets || [];
+        
+        // Specially update ledgers to MERGE branch entries
+        db.ref(AppState.systemSecret + '/bms/ledgers').update(AppState.ledgers || {});
+        
+        // Push bulk updates for other categories
+        db.ref(AppState.systemSecret + '/bms').update(updates);
+        
+        console.log("☁️ Nitro-Sync: Cloud updated atomically.");
     }
 }
 
@@ -601,7 +633,7 @@ function fallbackDownload(payload, fileName) {
 window.forceSyncData = async function() {
     if (!window.db) return showToast('تعذر الاتصال بقاعدة البيانات', 'error');
     
-    showToast('جاري سحب البيانات من السحابة... ⏳');
+    showToast('جاري سحب البيانات العميقة من السحابة... ⏳');
     
     try {
         const snap = await db.ref(AppState.systemSecret + '/bms').once('value');
@@ -620,6 +652,9 @@ window.forceSyncData = async function() {
             localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
             localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
             localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
+            
+            // Update Nitro Flag
+            AppState.isInitialSyncComplete = true;
             
             showToast('تم تحديث البيانات من السحابة بنجاح ✅', 'success');
             
@@ -873,13 +908,22 @@ function renderDashboard(el) {
         : `<span class="badge badge-success" style="font-size:12px;">🏢 ${BRANCHES[AppState.userBranch]?.name || ''}</span>`;
 
     el.innerHTML = `
+    ${!AppState.isInitialSyncComplete ? `
+    <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.7); backdrop-filter:blur(10px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:Cairo;">
+        <div class="loader-nitro" style="width:60px; height:60px; border:4px solid #f3f3f3; border-top:4px solid var(--primary); border-radius:50%; animation: spin 1s linear infinite; margin-bottom:20px;"></div>
+        <h2 style="color:var(--primary); font-weight:900;">Nitro-Sync: جاري جلب البيانات...</h2>
+        <p style="color:var(--text-secondary); margin-top:10px;">يرجى الانتظار ثوانٍ للتأكد من مزامنة آخر تقارير الفروع</p>
+    </div>
+    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+    ` : ''}
+
     <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center;">
         <div>
             <h1>مرحباً بك 👋</h1>
             <p>${isDev ? 'نظرة عامة كاملة على النظام' : 'بيانات فرعك الحالي'}</p>
         </div>
-        <button class="official-btn refresh-btn" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
-            🔄 تحديث البيانات سحابياً
+        <button class="official-btn refresh-btn ${AppState.isInitialSyncComplete ? 'synced' : ''}" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
+            ${AppState.isInitialSyncComplete ? '✅ تمت المزامنة' : '🔄 تحديث البيانات سحابياً'}
         </button>
     </div>
 
@@ -1067,13 +1111,22 @@ function renderManagerDashboard(el) {
     </div>`;
 
     el.innerHTML = `
+    ${!AppState.isInitialSyncComplete ? `
+    <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.7); backdrop-filter:blur(10px); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:Cairo;">
+        <div class="loader-nitro" style="width:60px; height:60px; border:4px solid #f3f3f3; border-top:4px solid var(--primary); border-radius:50%; animation: spin 1s linear infinite; margin-bottom:20px;"></div>
+        <h2 style="color:var(--primary); font-weight:900;">Nitro-Sync: جاري جلب البيانات...</h2>
+        <p style="color:var(--text-secondary); margin-top:10px;">يرجى الانتظار ثوانٍ للتأكد من مزامنة آخر تقارير الفروع</p>
+    </div>
+    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+    ` : ''}
+
     <div class="page-header animate-in" style="display:flex;align-items:center;justify-content:space-between;">
         <div>
             <h1>مرحباً ${AppState.managerName} 👋</h1>
             <p>استعراض التقارير اليومية للفروع</p>
         </div>
-        <button class="official-btn refresh-btn" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
-            🔄 تحديث البيانات سحابياً
+        <button class="official-btn refresh-btn ${AppState.isInitialSyncComplete ? 'synced' : ''}" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
+            ${AppState.isInitialSyncComplete ? '✅ تمت المزامنة' : '🔄 تحديث البيانات سحابياً'}
         </button>
     </div>
     ${summaryBannerHTML}
@@ -1503,8 +1556,8 @@ function renderReport(el, existingData = null) {
 
     <!-- Submission and Actions -->
     <div class="form-actions animate-in" style="margin-top:40px; display:flex; flex-direction:column; align-items:center; gap:20px;">
-        <button class="btn btn-primary" onclick="saveReport()" style="padding:18px 80px; border-radius:100px; font-size:20px; font-weight:bold; box-shadow:0 10px 30px rgba(0,96,100,0.3); background:var(--gradient-primary); border:none; color:#fff;">
-            💾 ${existingData ? 'تحديث التقرير النهائي' : 'حفظ وإرسال التقرير'}
+        <button class="btn btn-primary" onclick="saveReport()" ${!AppState.isInitialSyncComplete ? 'disabled' : ''} style="padding:18px 80px; border-radius:100px; font-size:20px; font-weight:bold; box-shadow:0 10px 30px rgba(0,96,100,0.3); background:var(--gradient-primary); border:none; color:#fff; ${!AppState.isInitialSyncComplete ? 'opacity:0.5; cursor:not-allowed;' : ''}">
+            ${!AppState.isInitialSyncComplete ? '⏳ جاري المزامنة مع السحابة...' : `💾 ${existingData ? 'تحديث التقرير النهائي' : 'حفظ وإرسال التقرير'}`}
         </button>
         <button class="btn btn-outline" onclick="navigate('dashboard')" style="padding:12px 40px; border-radius:100px; border:1px solid var(--border-color); color:var(--text-secondary);">
             ↩ إلغاء والعودة للوحة التحكم
@@ -1886,10 +1939,29 @@ window.saveReport = function() {
         AppState.reports.push(report);
     }
     
-    saveData();
+    saveReportEntry(report);
     showToast('تم حفظ التقرير بنجاح!', 'success');
     setTimeout(() => navigate('dashboard'), 1000);
 };
+
+// New Atomic Report Sync Function
+function saveReportEntry(reportObject) {
+    // Determine the index to sync
+    const index = AppState.reports.findIndex(r => r.id === reportObject.id);
+    if (index === -1) return;
+    
+    // Update local storage
+    localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
+    
+    // Atomic Cloud Update
+    if (window.db && AppState.isInitialSyncComplete) {
+        // Send ONLY this specific report to its array index in Firebase to prevent overwriting others
+        db.ref(AppState.systemSecret + '/bms/reports/' + index).set(reportObject);
+        console.log(`☁️ Granular Sync: Report [${index}] updated.`);
+    } else {
+        console.warn("⏳ Sync Pending or offline - local save only.");
+    }
+}
 
 
 // -------------------------
@@ -2963,8 +3035,9 @@ window.changeLedgerBranch = function(val) {
 };
 
 window.updateLedgerMeta = function(key, field, val) {
+    if (!AppState.ledgers[key]) return;
     AppState.ledgers[key][field] = parseFloat(val) || 0;
-    saveData();
+    saveLedgerEntry(key);
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
@@ -2988,7 +3061,7 @@ window.updateLedgerPreviousBalance = function(key, val) {
         report.currentBalance = report.financials.totalNet;
     }
 
-    saveData();
+    saveLedgerEntry(key);
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
@@ -3027,9 +3100,10 @@ window.fetchLastLedgerBalance = function(branchKey, activeDate) {
 };
 
 window.updateLedgerRow = function(key, idx, field, val) {
+    if (!AppState.ledgers[key]) return;
     if (field === 'value' || field === 'expense') val = parseFloat(val) || 0;
     AppState.ledgers[key].rows[idx][field] = val;
-    saveData();
+    saveLedgerEntry(key);
     // Instant update
     document.getElementById('ledgerTotalInflow').textContent = formatNumber(calculateLedgerInflow(key));
     document.getElementById('ledgerTotalOutflow').textContent = formatNumber(calculateLedgerOutflow(key));
@@ -3037,15 +3111,32 @@ window.updateLedgerRow = function(key, idx, field, val) {
 };
 
 window.addLedgerRow = function(key) {
+    if (!AppState.ledgers[key]) return;
     AppState.ledgers[key].rows.push({ bookingType: '', value: 0, receiptNo: '', clientName: '', expense: 0, type: '', notes: '' });
-    saveData();
+    saveLedgerEntry(key);
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
 window.saveLedger = function(key) {
-    saveData();
+    saveLedgerEntry(key);
     showToast('تم حفظ اليومية بنجاح 💾', 'success');
 };
+
+// New Atomic Ledger Sync Function
+function saveLedgerEntry(key) {
+    if (!AppState.ledgers[key]) return;
+    
+    // Update local storage
+    localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
+    
+    // Atomic Cloud Update
+    if (window.db && AppState.isInitialSyncComplete) {
+        db.ref(AppState.systemSecret + '/bms/ledgers/' + key).set(AppState.ledgers[key]);
+        console.log(`☁️ Granular Sync: Ledger ${key} updated.`);
+    } else {
+        console.warn("⏳ Sync Pending or offline - local save only.");
+    }
+}
 
 window.calculateLedgerInflow = function(key) {
     const l = AppState.ledgers[key];
