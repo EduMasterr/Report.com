@@ -1941,18 +1941,19 @@ function renderEmployees(el) {
 // -------------------------
 function renderFinance(el) {
     const isBranch = AppState.userRole === 'branch';
-    let reports = AppState.reports;
+    let reports = AppState.reports || [];
     
     if (isBranch) {
-        reports = AppState.reports.filter(r => r.branch === AppState.userBranch);
+        reports = reports.filter(r => r.branch === AppState.userBranch);
     } else if (AppState.currentBranch && AppState.currentBranch !== 'all') {
-        reports = AppState.reports.filter(r => r.branch === AppState.currentBranch);
+        reports = reports.filter(r => r.branch === AppState.currentBranch);
     }
     
-    const totalRevenue = reports.reduce((s, r) => s + (r.morning.revenue || 0) + (r.evening.revenue || 0), 0);
-    const totalExpenses = reports.reduce((s, r) => s + r.expenses.reduce((x,e)=>x+Number(e.amount||0),0), 0);
+    // Aggregation using the current financials structure
+    const totalRevenue = reports.reduce((s, r) => s + (r.financials?.dailyInflow || 0), 0);
+    const totalExpenses = reports.reduce((s, r) => s + (r.financials?.dailyOutflow || 0), 0);
     const netRevenue = totalRevenue - totalExpenses;
-    const latestBalance = reports.length ? reports[reports.length - 1].currentBalance : 0;
+    const latestBalance = reports.length ? (reports[reports.length - 1].currentBalance || 0) : 0;
 
     el.innerHTML = `
     <div class="page-header animate-in">
@@ -1986,26 +1987,42 @@ function renderFinance(el) {
     <div class="section-card animate-in">
         <div class="section-card-header">
             <div class="header-icon expense">📋</div>
-            <h3>سجل المصروفات</h3>
+            <h3>سجل المصروفات المجمع</h3>
         </div>
         <div class="section-card-body table-wrapper">
             <table>
                 <thead>
-                    <tr><th>التاريخ</th><th>الفرع</th><th>المستفيد</th><th>النوع</th><th>المبلغ</th></tr>
+                    <tr><th>التاريخ</th><th>الفرع</th><th>البيان</th><th>المبلغ</th></tr>
                 </thead>
                 <tbody>
-                    ${reports.flatMap(r => r.expenses.map(e => ({...e, date: r.date, branch: r.branch}))).length === 0
-                        ? `<tr><td colspan="5"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد مصروفات مسجلة</p></div></td></tr>`
-                        : reports.flatMap(r => r.expenses.map(e => `
+                    ${(() => {
+                        const allExpenses = reports.flatMap(r => {
+                            const mOut = r.financials?.morningOutflowList || [];
+                            const eBookOut = r.financials?.eveningOutflowList || [];
+                            // Backwards compatibility for legacy reports
+                            const legacyOut = r.expenses || [];
+                            
+                            return [...mOut, ...eBookOut, ...legacyOut].map(e => ({
+                                date: r.date,
+                                branch: r.branch,
+                                statement: e.statement || e.beneficiary || 'منصرف',
+                                amount: e.amount || 0
+                            }));
+                        });
+
+                        if (allExpenses.length === 0) {
+                            return `<tr><td colspan="4"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد مصروفات مسجلة</p></div></td></tr>`;
+                        }
+
+                        return allExpenses.map(e => `
                             <tr>
-                                <td>${e.date || r.date}</td>
-                                <td>${BRANCHES[r.branch]?.name || r.branch}</td>
-                                <td>${e.beneficiary}</td>
-                                <td>${e.type}</td>
+                                <td>${e.date}</td>
+                                <td>${BRANCHES[e.branch]?.name || e.branch}</td>
+                                <td>${e.statement}</td>
                                 <td class="amount-cell expense">${formatNumber(e.amount)} ج.م</td>
-                            </tr>`
-                        )).join('')
-                    }
+                            </tr>
+                        `).join('');
+                    })()}
                 </tbody>
             </table>
         </div>
@@ -2014,23 +2031,23 @@ function renderFinance(el) {
     <div class="section-card animate-in">
         <div class="section-card-header">
             <div class="header-icon finance">📊</div>
-            <h3>التقرير اليومي والماليات | Report</h3>
+            <h3>سجل حركات التقارير اليومية</h3>
         </div>
         <div class="section-card-body table-wrapper">
             <table>
                 <thead>
-                    <tr><th>التاريخ</th><th>الفرع</th><th>إيراد الصباح</th><th>إيراد المساء</th><th>المصروفات</th><th>الرصيد</th></tr>
+                    <tr><th>التاريخ</th><th>الفرع</th><th>الإيراد</th><th>المصروف</th><th>الصافي</th><th>الرصيد النهائي</th></tr>
                 </thead>
                 <tbody>
-                    ${reports.map(r => `
+                    ${reports.length > 0 ? reports.map(r => `
                     <tr>
                         <td>${r.date}</td>
                         <td>${BRANCHES[r.branch]?.name || r.branch}</td>
-                        <td class="amount-cell">${formatNumber(r.morning.revenue)}</td>
-                        <td class="amount-cell">${formatNumber(r.evening.revenue)}</td>
-                        <td class="amount-cell expense">${formatNumber(r.expenses.reduce((s,e)=>s+Number(e.amount||0),0))}</td>
-                        <td><strong>${formatNumber(r.currentBalance)}</strong></td>
-                    </tr>`).join('') || `<tr><td colspan="6"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد تقارير</p></div></td></tr>`}
+                        <td class="amount-cell">${formatNumber(r.financials?.dailyInflow || 0)}</td>
+                        <td class="amount-cell expense">${formatNumber(r.financials?.dailyOutflow || 0)}</td>
+                        <td class="amount-cell" style="color:var(--primary)">${formatNumber((r.financials?.dailyInflow || 0) - (r.financials?.dailyOutflow || 0))}</td>
+                        <td><strong>${formatNumber(r.currentBalance || 0)}</strong></td>
+                    </tr>`).reverse().join('') : `<tr><td colspan="6"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد تقارير</p></div></td></tr>`}
                 </tbody>
             </table>
         </div>
