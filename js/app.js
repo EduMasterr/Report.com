@@ -795,6 +795,35 @@ function navigate(page) {
 }
 
 // -------------------------
+window.handleTopbarBranchChange = function(val) {
+    AppState.currentBranch = val;
+    if (AppState.userRole) navigate(AppState.currentPage);
+};
+
+window.handleFilterBranchChange = function(val) {
+    // This is handled by selectCustomOption setting the data-value
+};
+
+function renderCustomBranchSelect(id, initialVal, callbackName) {
+    const branchList = (typeof BRANCHES !== 'undefined' && BRANCHES) ? BRANCHES : DEFAULT_BRANCHES;
+    const currentBranch = branchList[initialVal] || { name: 'جميع الفروع (تقرير مجمع)' };
+    const label = (initialVal === 'all') ? 'جميع الفروع (تقرير مجمع)' : currentBranch.name;
+
+    return `
+    <div class="custom-select-wrapper" id="${id}-wrapper" style="width:100%; min-width:220px;">
+        <div class="custom-select-trigger" id="${id}-trigger" data-value="${initialVal}" style="background:#001f3f;" onclick="toggleCustomSelect('${id}')">
+            <span id="${id}-text">${label}</span>
+            <span class="chevron">▼</span>
+        </div>
+        <div class="custom-options" id="${id}-options">
+            <div class="custom-option" onclick="selectCustomOption('${id}','all','جميع الفروع (تقرير مجمع)','#001f3f','${callbackName}')">جميع الفروع (تقرير مجمع)</div>
+            ${Object.entries(branchList).map(([k,v]) => `
+                <div class="custom-option" onclick="selectCustomOption('${id}','${k}','${v.name}','#001f3f','${callbackName}')">${v.name}</div>
+            `).join('')}
+        </div>
+    </div>`;
+}
+
 // Page: Dashboard
 // -------------------------
 function renderDashboard(el) {
@@ -1153,10 +1182,7 @@ function renderManagerDashboard(el) {
             </div>
             <div class="form-group">
                 <label>اختر الفرع</label>
-                <select id="mBranchFilter" class="form-input">
-                    <option value="all">جميع الفروع (تقرير مجمع)</option>
-                    ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('')}
-                </select>
+                ${renderCustomBranchSelect('mBranchFilter', 'all', 'handleFilterBranchChange')}
             </div>
             <button class="btn btn-primary" onclick="searchManagerReport()" style="padding:12px;">إظهار التقرير</button>
         </div>
@@ -1181,7 +1207,8 @@ window.resetManagerDate = function() {
 
 window.searchManagerReport = function() {
     const date = document.getElementById('mDateFilter').value;
-    const branchKey = document.getElementById('mBranchFilter').value;
+    const branchFilterTrigger = document.getElementById('mBranchFilter-trigger');
+    const branchKey = branchFilterTrigger ? branchFilterTrigger.dataset.value : 'all';
     const res = document.getElementById('mReportResult');
 
     const reports = (branchKey === 'all') 
@@ -1198,8 +1225,11 @@ window.searchManagerReport = function() {
     }
 
     if (branchKey === 'all') {
-        const totalRev = reports.reduce((s, r) => s + (r?.financials?.dailyInflow || 0), 0);
-        const totalExp = reports.reduce((s, r) => s + (r?.financials?.dailyOutflow || 0), 0);
+        const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
+        const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
+
+        const totalRev = reports.reduce((s, r) => s + getInc(r), 0);
+        const totalExp = reports.reduce((s, r) => s + getExp(r), 0);
         const totalBucks = reports.reduce((s, r) => s + (r?.morning?.bookings || 0) + (r?.evening?.bookings || 0), 0);
 
         res.innerHTML = `
@@ -2928,14 +2958,14 @@ window.renderDailyBudget = function(el) {
     </div>
 
         <!-- MODERN LEDGER TABLE HEADER -->
-        <div class="official-table-grid" style="grid-template-columns: 45px 2.2fr 95px 95px 1.5fr 95px 1fr 1.2fr; background: linear-gradient(135deg, #34495e, #2c3e50); color:#fff; font-weight:950; font-size:13px; text-align:center; border-radius:100px; margin-bottom:15px; padding:12px; box-shadow:0 8px 15px rgba(0,0,0,0.1);">
+        <div class="official-table-grid" style="grid-template-columns: 50px 1fr 90px 90px 1fr 90px 1fr 1.2fr; background: #2c3e50; color:#fff; font-weight:950; font-size:13px; text-align:center; border-radius:100px; margin-bottom:15px; padding:15px 0; box-shadow:0 8px 15px rgba(0,0,0,0.1); gap:10px;">
             <div>م</div>
-            <div>نوع الحجز والبيان</div>
+            <div>بيان الحجز</div>
             <div>الوارد (+)</div>
             <div>رقم الإيصال</div>
             <div>اسم العميل</div>
             <div>المنصرف (-)</div>
-            <div>نوع المنصرف</div>
+            <div>بيان المنصرف</div>
             <div>ملاحظات</div>
         </div>
 
@@ -2947,7 +2977,7 @@ window.renderDailyBudget = function(el) {
                 
                 <!-- Statement Capsule (Large) -->
                 <div class="capsule-input capsule-large">
-                    <input type="text" placeholder="نوع الحجز والبيان..." value="${row.bookingType||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'bookingType', this.value)">
+                    <input type="text" placeholder="بيان الحجز..." value="${row.bookingType||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'bookingType', this.value)">
                 </div>
 
                 <!-- Inflow Capsule (Small/Green) -->
@@ -2972,7 +3002,7 @@ window.renderDailyBudget = function(el) {
 
                 <!-- Exp Type Capsule (Medium) -->
                 <div class="capsule-input capsule-medium">
-                    <input type="text" placeholder="نوع المنصرف" value="${row.type||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'type', this.value)">
+                    <input type="text" placeholder="بيان المنصرف" value="${row.type||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'type', this.value)">
                 </div>
 
                 <!-- Notes Capsule (Medium) -->
@@ -3319,13 +3349,38 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay.classList.remove('show');
     });
 
-    // Branch selector in topbar
-    document.getElementById('branchSelect')?.addEventListener('change', (e) => {
-        AppState.currentBranch = e.target.value;
-        if (AppState.userRole) {
-            navigate(AppState.currentPage);
+    // --- Modern Branch Selector Initialization ---
+    window.toggleCustomSelect = function(id) {
+        const options = document.getElementById(id + '-options');
+        if (options) options.classList.toggle('show');
+    };
+
+    window.selectCustomOption = function(id, val, name, color, callbackName) {
+        const trigger = document.getElementById(id + '-trigger');
+        const triggerText = document.getElementById(id + '-text');
+        const options = document.getElementById(id + '-options');
+        
+        if (trigger) trigger.style.background = color;
+        if (triggerText) triggerText.innerText = name;
+        if (options) options.classList.remove('show');
+
+        // Execute original logic
+        if (callbackName && typeof window[callbackName] === 'function') {
+            window[callbackName](val);
+        }
+    };
+
+    // Global listener to close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.custom-select-wrapper')) {
+            document.querySelectorAll('.custom-options').forEach(opt => opt.classList.remove('show'));
         }
     });
+
+    function initCustomSelects() {
+        // Find existing branch selects and potentially replace them if needed, 
+        // but for now we'll rely on the renderManagerDashboard etc calling their own logic.
+    }
 
     // Keyboard Shortcuts
     document.addEventListener('keydown', (e) => {

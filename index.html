@@ -96,16 +96,21 @@
 
             <div class="topbar-actions">
                 <div class="branch-selector">
-                    <select id="branchSelect">
-                        <option value="" disabled selected>اختر الفرع...</option>
-                        <option value="all">جميع الفروع</option>
-                        <option value="miami">فرع ميامي</option>
-                        <option value="mandara">فرع المندرة</option>
-                        <option value="soyouf">فرع السيوف</option>
-                        <option value="smouha">فرع سموحة</option>
-                        <option value="agamy">فرع العجمي</option>
-                        <option value="branch6">الفرع السادس</option>
-                    </select>
+                    <div class="custom-select-wrapper" id="branchSelect-wrapper">
+                        <div class="custom-select-trigger" id="branchSelect-trigger" style="background:#001f3f;" onclick="toggleCustomSelect('branchSelect')">
+                            <span id="branchSelect-text">جميع الفروع (تقرير مجمع)</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                        <div class="custom-options" id="branchSelect-options">
+                            <div class="custom-option" onclick="selectCustomOption('branchSelect','all','جميع الفروع (تقرير مجمع)','#001f3f','handleTopbarBranchChange')">جميع الفروع (تقرير مجمع)</div>
+                            <div class="custom-option" onclick="selectCustomOption('branchSelect','miami','فرع ميامي','#1a5276','handleTopbarBranchChange')">فرع ميامي</div>
+                            <div class="custom-option" onclick="selectCustomOption('branchSelect','mandara','فرع المندرة','#512e5f','handleTopbarBranchChange')">فرع المندرة</div>
+                            <div class="custom-option" onclick="selectCustomOption('branchSelect','soyouf','فرع السيوف','#8B0000','handleTopbarBranchChange')">فرع السيوف</div>
+                            <div class="custom-option" onclick="selectCustomOption('branchSelect','smouha','فرع سموحة','#1d6a3e','handleTopbarBranchChange')">فرع سموحة</div>
+                            <div class="custom-option" onclick="selectCustomOption('branchSelect','agamy','فرع العجمي','#7d6608','handleTopbarBranchChange')">فرع العجمي</div>
+                            <div class="custom-option" onclick="selectCustomOption('branchSelect','branch6','الفرع السادس','#2c3e50','handleTopbarBranchChange')">الفرع السادس</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="user-profile-group"
                     style="display:flex; flex-direction:column; align-items:center; gap:2px;">
