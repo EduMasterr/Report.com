@@ -97,7 +97,8 @@ window.syncWithCloud = function() {
     db.ref(AppState.systemSecret + '/bms/reports').on('value', snap => {
         if (!AppState.userRole) return;
         if (snap.exists()) {
-            AppState.reports = snap.val();
+            const raw = snap.val();
+            AppState.reports = Array.isArray(raw) ? raw : Object.values(raw);
             localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
             console.log("✅ Reports synced");
             if (AppState.currentPage === 'dashboard') navigate('dashboard');
@@ -108,7 +109,8 @@ window.syncWithCloud = function() {
     db.ref(AppState.systemSecret + '/bms/budgets').on('value', snap => {
         if (!AppState.userRole) return;
         if (snap.exists()) {
-            AppState.budgets = snap.val();
+            const raw = snap.val();
+            AppState.budgets = Array.isArray(raw) ? raw : Object.values(raw);
             localStorage.setItem('bms_budgets', JSON.stringify(AppState.budgets));
             console.log("✅ Budgets synced");
             if (AppState.currentPage === 'dailybudget') navigate('dailybudget');
@@ -800,12 +802,16 @@ function renderDashboard(el) {
             totalExpenses = calculateLedgerOutflow(lKey);
             currentBalance = calculateLedgerEndBalance(lKey);
         } else {
-            // Fallback to today's report if no ledger row yet
+            // Fallback to today's report
             const tRep = allReports.find(r => r.branch === AppState.userBranch && r.date === tDate);
             if (tRep) {
                 totalRevenue = getInc(tRep);
                 totalExpenses = getExp(tRep);
                 currentBalance = tRep.currentBalance || 0;
+            } else {
+                // Second Fallback: Last known historical balance
+                const lastRep = userReports[userReports.length - 1];
+                currentBalance = lastRep?.currentBalance || 0;
             }
         }
     } else {
