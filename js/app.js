@@ -11,11 +11,13 @@ const AppState = {
     theme: localStorage.getItem('theme') || 'light',
     reports: JSON.parse(localStorage.getItem('bms_reports') || '[]'),
     expenses: JSON.parse(localStorage.getItem('bms_expenses') || '[]'),
+    budgets: JSON.parse(localStorage.getItem('bms_budgets') || '[]'),
     userRole: localStorage.getItem('bms_role'),   // 'developer' | 'manager' | 'branch'
     userBranch: localStorage.getItem('bms_branch'),
     managerName: localStorage.getItem('bms_manager_name') || 'المدير العام',
     masterPassword: localStorage.getItem('bms_master_pass') || 'admin#135',
     backupPath: localStorage.getItem('bms_backup_path') || 'D:\\\\Backups-Report',
+    ledgers: JSON.parse(localStorage.getItem('bms_ledgers') || '{}'), 
     systemSecret: 'ReportV2_SecurePath_882' // Dynamic path for cloud data
 };
 
@@ -44,7 +46,7 @@ const DEFAULT_EMPLOYEES = [
     { id: 'E009', name: 'روان',     role: 'سكرتيرة',    branch: 'soyouf' },
 
     { id: 'E010', name: 'هدى',      role: 'مديرة الفرع', branch: 'smouha' },
-    { id: 'E011', name: 'حبيبة',    role: 'سكرتيرة',    branch: 'smouha' },
+    { id: 'E011', name: 'حبيبة صلاح',    role: 'سكرتيرة',    branch: 'smouha' },
     { id: 'E012', name: 'حبيبة خليل', role: 'سكرتيرة',  branch: 'smouha' },
 
     { id: 'E013', name: 'رضوى',     role: 'مديرة الفرع', branch: 'agamy' },
@@ -99,6 +101,26 @@ window.syncWithCloud = function() {
         }
     });
 
+    // Real-time budgets
+    db.ref(AppState.systemSecret + '/bms/budgets').on('value', snap => {
+        if (snap.exists()) {
+            AppState.budgets = snap.val();
+            localStorage.setItem('bms_budgets', JSON.stringify(AppState.budgets));
+            console.log("✅ Budgets synced");
+            if (AppState.currentPage === 'dailybudget') navigate('dailybudget');
+        }
+    });
+
+    // Real-time ledgers
+    db.ref(AppState.systemSecret + '/bms/ledgers').on('value', snap => {
+        if (snap.exists()) {
+            AppState.ledgers = snap.val();
+            localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
+            console.log("✅ Ledgers synced");
+            if (AppState.currentPage === 'dailybudget') renderDailyBudget(document.getElementById('pageContent'));
+        }
+    });
+
     // Monitor Connection Status
     const connectedRef = db.ref(".info/connected");
     connectedRef.on("value", (snap) => {
@@ -118,15 +140,21 @@ window.syncWithCloud = function() {
     });
 };
 
+
+
 function saveData() {
     localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
     localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
     localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
+    localStorage.setItem('bms_budgets', JSON.stringify(AppState.budgets));
+    localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
     
     if (window.db) {
         db.ref(AppState.systemSecret + '/bms/reports').set(AppState.reports || []);
         db.ref(AppState.systemSecret + '/bms/branches').set(BRANCHES || {});
         db.ref(AppState.systemSecret + '/bms/employees').set(EMPLOYEES || []);
+        db.ref(AppState.systemSecret + '/bms/budgets').set(AppState.budgets || []);
+        db.ref(AppState.systemSecret + '/bms/ledgers').set(AppState.ledgers || {});
     }
 }
 
@@ -138,6 +166,7 @@ function checkSeeding() {
             db.ref(AppState.systemSecret + '/bms/branches').set(DEFAULT_BRANCHES);
             db.ref(AppState.systemSecret + '/bms/employees').set(DEFAULT_EMPLOYEES);
             db.ref(AppState.systemSecret + '/bms/reports').set([]);
+            db.ref(AppState.systemSecret + '/bms/budgets').set([]);
         }
     });
 }
@@ -501,6 +530,7 @@ window.createLocalBackup = async function(isSilent = false) {
             reports: AppState.reports,
             branches: BRANCHES,
             employees: EMPLOYEES,
+            budgets: AppState.budgets,
             exportDate: new Date().toISOString(),
             branchAccount: AppState.userBranch || 'admin'
         };
@@ -591,6 +621,8 @@ function updateNavVisibility() {
     document.getElementById('nav-branches').style.setProperty('display', (isDev) ? '' : 'none', 'important');
     document.getElementById('nav-employees').style.setProperty('display', (isDev) ? '' : 'none', 'important'); 
     document.getElementById('nav-finance').style.setProperty('display', (isDev || isManager || isBranch) ? '' : 'none', 'important');
+    const navDailyBudget = document.getElementById('nav-dailybudget');
+    if(navDailyBudget) navDailyBudget.style.setProperty('display', (isDev || isManager || isBranch) ? '' : 'none', 'important');
     document.getElementById('nav-admin').style.setProperty('display', (isDev) ? '' : 'none', 'important');
     
     // Branch selector in topbar — only for dev/manager
@@ -650,6 +682,7 @@ function navigate(page) {
         branches: 'إدارة الفروع',
         employees: 'الموظفين',
         finance: 'المالية',
+        dailybudget: 'الميزانية اليومية',
         admin: 'الأدمن إديتور',
     };
     document.getElementById('pageTitle').textContent = titles[page] || '';
@@ -670,6 +703,7 @@ function navigate(page) {
         case 'branches':  renderBranches(container);  break;
         case 'employees': renderEmployees(container); break;
         case 'finance':   renderFinance(container);   break;
+        case 'dailybudget': renderDailyBudget(container); break;
         case 'admin':     renderAdmin(container);     break;
     }
 }
@@ -706,25 +740,83 @@ function renderDashboard(el) {
         return;
     }
 
-    const totalRevenue = userReports.reduce((s, r) => s + (r.morning.revenue || 0) + (r.evening.revenue || 0), 0);
-    const totalExpenses = userReports.reduce((s, r) => s + r.expenses.reduce((x, e) => x + Number(e.amount || 0), 0), 0);
+    // Fallback-safe aggregation
+    const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
+    const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
+
+    // --- Today's Metrics (Ledger-First) ---
+    const tDate = today();
+    let totalRevenue = 0;
+    let totalExpenses = 0;
+    let currentBalance = 0;
+
+    if (isBranch) {
+        const lKey = `${AppState.userBranch}_${tDate}`;
+        if (AppState.ledgers[lKey]) {
+            totalRevenue = calculateLedgerInflow(lKey);
+            totalExpenses = calculateLedgerOutflow(lKey);
+            currentBalance = calculateLedgerEndBalance(lKey);
+        } else {
+            // Fallback to today's report if no ledger row yet
+            const tRep = allReports.find(r => r.branch === AppState.userBranch && r.date === tDate);
+            if (tRep) {
+                totalRevenue = getInc(tRep);
+                totalExpenses = getExp(tRep);
+                currentBalance = tRep.currentBalance || 0;
+            }
+        }
+    } else {
+        // Manager/Dev "Total" for all branches today
+        Object.keys(BRANCHES).forEach(bKey => {
+            const lKey = `${bKey}_${tDate}`;
+            if (AppState.ledgers[lKey]) {
+                totalRevenue += calculateLedgerInflow(lKey);
+                totalExpenses += calculateLedgerOutflow(lKey);
+                currentBalance += calculateLedgerEndBalance(lKey);
+            } else {
+                const tRep = allReports.find(r => r.branch === bKey && r.date === tDate);
+                if (tRep) {
+                    totalRevenue += getInc(tRep);
+                    totalExpenses += getExp(tRep);
+                    currentBalance += tRep.currentBalance || 0;
+                }
+            }
+        });
+    }
     const netRevenue = totalRevenue - totalExpenses;
-    const latestReport = userReports[userReports.length - 1];
-    const currentBalance = latestReport ? latestReport.currentBalance : 0;
 
     const branchEntries = Object.entries(BRANCHES).filter(([k]) => k === AppState.userBranch);
 
     const branchData = branchEntries.map(([key, branch]) => {
-        const bReports = allReports.filter(r => r.branch === key);
-        const bRev = bReports.reduce((s,r) => s + (r.morning.revenue||0) + (r.evening.revenue||0), 0);
-        const bExp = bReports.reduce((s,r) => s + r.expenses.reduce((x,e)=>x+Number(e.amount||0),0), 0);
-        const bCalls = bReports.reduce((s,r) => s + (r.morning.calls||0) + (r.evening.calls||0), 0);
-        const bBookings = bReports.reduce((s,r) => s + (r.morning.bookings||0) + (r.evening.bookings||0), 0);
+        const bReports = allReports.filter(r => r?.branch === key);
+        const bRev = bReports.reduce((s, r) => s + getInc(r), 0);
+        const bExp = bReports.reduce((s, r) => s + getExp(r), 0);
+        const bCalls = bReports.reduce((s,r) => s + (r?.morning?.calls||0) + (r?.evening?.calls||0), 0);
+        const bBookings = bReports.reduce((s,r) => s + (r?.morning?.bookings||0) + (r?.evening?.bookings||0), 0);
         const bStaff = EMPLOYEES.filter(e => e.branch === key);
         const bManager = bStaff.find(e => e.role === 'مديرة الفرع');
         const bSecretaries = bStaff.filter(e => e.role !== 'مديرة الفرع');
         const lastReport = bReports[bReports.length - 1];
-        return { key, branch, bReports, bRev, bExp, bCalls, bBookings, bStaff, bManager, bSecretaries, lastReport };
+
+        // Today's details for the card
+        const lKey = `${key}_${tDate}`;
+        let tRev = 0, tExp = 0, tBal = 0;
+        if (AppState.ledgers[lKey]) {
+            tRev = calculateLedgerInflow(lKey);
+            tExp = calculateLedgerOutflow(lKey);
+            tBal = calculateLedgerEndBalance(lKey);
+        } else {
+            const tRep = allReports.find(r => r.branch === key && r.date === tDate);
+            if (tRep) {
+                tRev = getInc(tRep);
+                tExp = getExp(tRep);
+                tBal = tRep.currentBalance || 0;
+            } else {
+                tBal = lastReport?.currentBalance || 0;
+            }
+        }
+
+        return { key, branch, bReports, bRev, bExp, bCalls, bBookings, bStaff, bManager, bSecretaries, lastReport, tRev, tExp, tBal };
     });
 
     const roleLabel = isDev
@@ -732,40 +824,27 @@ function renderDashboard(el) {
         : `<span class="badge badge-success" style="font-size:12px;">🏢 ${BRANCHES[AppState.userBranch]?.name || ''}</span>`;
 
     el.innerHTML = `
-    <div class="page-header animate-in" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
-        <div>
-            <h1>مرحباً بك 👋</h1>
-            <p>${isDev ? 'نظرة عامة كاملة على النظام' : 'بيانات فرعك الحالي'}</p>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;">
-            ${roleLabel}
-        </div>
+    <div class="page-header animate-in">
+        <h1>مرحباً بك 👋</h1>
+        <p>${isDev ? 'نظرة عامة كاملة على النظام' : 'بيانات فرعك الحالي'}</p>
     </div>
 
-    <div class="summary-grid">
-        <div class="summary-card red animate-in">
-            <span class="card-icon">💰</span>
-            <div class="card-label">${isDev ? 'إجمالي الإيرادات' : 'إيرادات الفرع'}</div>
-            <div class="card-value" data-count="${totalRevenue}">0</div>
-            <span class="card-unit">ج.م</span>
+    <div class="official-summary-banner animate-in">
+        <div class="official-summary-item">
+            <div class="label">مجموع ايراد اليوم</div>
+            <div class="value">${formatNumber(totalRevenue)}</div>
         </div>
-        <div class="summary-card gold animate-in">
-            <span class="card-icon">📤</span>
-            <div class="card-label">${isDev ? 'إجمالي المصروفات' : 'مصروفات الفرع'}</div>
-            <div class="card-value" data-count="${totalExpenses}">0</div>
-            <span class="card-unit">ج.م</span>
+        <div class="official-summary-item">
+            <div class="label">مجموع منصرف</div>
+            <div class="value">${formatNumber(totalExpenses)}</div>
         </div>
-        <div class="summary-card green animate-in">
-            <span class="card-icon">📈</span>
-            <div class="card-label">صافي الإيراد</div>
-            <div class="card-value" data-count="${netRevenue}">0</div>
-            <span class="card-unit">ج.م</span>
+        <div class="official-summary-item">
+            <div class="label">صافي ايراد اليوم</div>
+            <div class="value">${formatNumber(netRevenue)}</div>
         </div>
-        <div class="summary-card blue animate-in">
-            <span class="card-icon">🏦</span>
-            <div class="card-label">الرصيد الحالي</div>
-            <div class="card-value" data-count="${currentBalance}">0</div>
-            <span class="card-unit">ج.م</span>
+        <div class="official-summary-item highlight">
+            <div class="label">الرصيد الحالي</div>
+            <div class="value">${formatNumber(currentBalance)}</div>
         </div>
     </div>
 
@@ -775,47 +854,42 @@ function renderDashboard(el) {
 
     <div class="branches-grid">
         ${branchData.map((bd, i) => `
-        <div class="branch-card animate-in" style="animation-delay:${i*0.07}s">
-            <div class="branch-card-top" style="background: linear-gradient(135deg, ${bd.branch.color} 0%, ${bd.branch.color}cc 100%);">
-                <div class="branch-name">${bd.branch.name}</div>
-                <div class="branch-location">📍 ${bd.branch.city} ${bd.bManager ? '· مديرة: ' + bd.bManager.name : ''}</div>
+        <div class="official-dashboard-card animate-in" style="animation-delay:${i*0.07}s">
+            <div class="official-card-header">
+                <div class="name">${bd.branch.name}</div>
+                <div class="loc">📍 ${bd.branch.city} ${bd.bManager ? '· مديرة: ' + bd.bManager.name : ''}</div>
             </div>
-            <div class="branch-card-body">
-                <div class="branch-stat-row">
-                    <span class="bsr-label">الإيرادات</span>
-                    <span class="bsr-val" style="color:#27ae60;">${formatNumber(bd.bRev)} ج.م</span>
+            <div class="official-card-body">
+                <div class="official-stat-row">
+                    <span class="official-stat-label">مجموع الإيراد اليوم</span>
+                    <span class="official-stat-value">${formatNumber(bd.tRev || 0)} ج.م</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">المصروفات</span>
-                    <span class="bsr-val" style="color:#e74c3c;">${formatNumber(bd.bExp)} ج.م</span>
+                <div class="official-stat-row">
+                    <span class="official-stat-label">مجموع المنصرف اليوم</span>
+                    <span class="official-stat-value">${formatNumber(bd.tExp || 0)} ج.م</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">الصافي</span>
-                    <span class="bsr-val" style="color:var(--primary);font-weight:900;">${formatNumber(bd.bRev - bd.bExp)} ج.م</span>
+                <div class="official-stat-row">
+                    <span class="official-stat-label">صافي إيراد اليوم</span>
+                    <span class="official-stat-value" style="color:var(--primary) !important;">${formatNumber(bd.tRev - bd.tExp)} ج.م</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">الاتصالات</span>
-                    <span class="bsr-val">${bd.bCalls}</span>
+                <div class="official-stat-row">
+                    <span class="official-stat-label">السكرتارية المختصة</span>
+                    <span class="official-stat-value" style="font-size:13px;">${bd.bSecretaries.map(s => s.name).join(' · ') || '—'}</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">الحجوزات</span>
-                    <span class="bsr-val">${bd.bBookings}</span>
+                <div class="official-stat-row">
+                    <span class="official-stat-label">الاتصالات / الحجوزات</span>
+                    <span class="official-stat-value">${bd.bCalls} / ${bd.bBookings}</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">التقارير</span>
-                    <span class="bsr-val">${bd.bReports.length} تقرير</span>
+                <div class="official-stat-row" style="background:#fdf5e6; border-top:1px solid #000;">
+                    <span class="official-stat-label">الرصيد الفعلي الحالي</span>
+                    <span class="official-stat-value" style="color:#b20000 !important;">${formatNumber(bd.tBal || 0)} ج.م</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">السكرتارية</span>
-                    <span class="bsr-val">${isManager ? 'موظف مختص' : (bd.bSecretaries.map(s => s.name).join(' · ') || '—')}</span>
-                </div>
-                ${bd.lastReport ? `<div class="branch-stat-row" style="border-bottom:none;padding-top:12px;border-top:1px dashed var(--border-color);margin-top:4px;">
-                    <span class="bsr-label">آخر تقرير</span>
-                    <span class="bsr-val" style="font-size:12px;">${bd.lastReport.date}</span>
-                </div>` : ''}
             </div>
-            ${isBranch ? `<div class="branch-card-footer">
-                <button class="btn btn-outline" style="flex:1;font-size:13px;padding:8px 12px;" onclick="navigate('report')">📝 تقرير جديد</button>
+            ${isBranch ? `
+            <div class="official-card-footer">
+                <button class="official-btn" onclick="navigate('report')">
+                    ${bd.bReports.some(r => r.date === today()) ? '✏️ تعديل تقرير اليوم' : '📝 تقرير جديد'}
+                </button>
             </div>` : ''}
         </div>`).join('')}
     </div>
@@ -838,12 +912,15 @@ function renderManagerDashboard(el) {
         branchEntries = branchEntries.filter(([key]) => key === AppState.currentBranch);
     }
 
+    const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
+    const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
+
     const branchData = branchEntries.map(([key, branch]) => {
-        const bReports = allReports.filter(r => r.branch === key);
-        const bRev = bReports.reduce((s,r) => s + (r.morning.revenue||0) + (r.evening.revenue||0), 0);
-        const bExp = bReports.reduce((s,r) => s + r.expenses.reduce((x,e)=>x+Number(e.amount||0),0), 0);
-        const bCalls = bReports.reduce((s,r) => s + (r.morning.calls||0) + (r.evening.calls||0), 0);
-        const bBookings = bReports.reduce((s,r) => s + (r.morning.bookings||0) + (r.evening.bookings||0), 0);
+        const bReports = allReports.filter(r => r?.branch === key);
+        const bRev = bReports.reduce((s, r) => s + getInc(r), 0);
+        const bExp = bReports.reduce((s, r) => s + getExp(r), 0);
+        const bCalls = bReports.reduce((s, r) => s + (r?.morning?.calls || 0) + (r?.evening?.calls || 0), 0);
+        const bBookings = bReports.reduce((s, r) => s + (r?.morning?.bookings || 0) + (r?.evening?.bookings || 0), 0);
         const bStaff = EMPLOYEES.filter(e => e.branch === key);
         const bManager = bStaff.find(e => e.role === 'مديرة الفرع');
         const bSecretaries = bStaff.filter(e => e.role !== 'مديرة الفرع');
@@ -855,50 +932,82 @@ function renderManagerDashboard(el) {
         ? BRANCHES[AppState.currentBranch]?.name 
         : 'جميع الفروع المستقلة';
 
+    // --- Aggregate Manager Metrics for Today ---
+    const tDate = today();
+    let totalManagerRev = 0;
+    let totalManagerExp = 0;
+    let totalManagerBal = 0;
+
+    branchData.forEach(bd => {
+        const lKey = `${bd.key}_${tDate}`;
+        if (AppState.ledgers[lKey]) {
+            bd.tRev = calculateLedgerInflow(lKey);
+            bd.tExp = calculateLedgerOutflow(lKey);
+            bd.tBal = calculateLedgerEndBalance(lKey);
+        } else {
+            const tRep = allReports.find(r => r.branch === bd.key && r.date === tDate);
+            bd.tRev = tRep ? getInc(tRep) : 0;
+            bd.tExp = tRep ? getExp(tRep) : 0;
+            bd.tBal = tRep ? (tRep.currentBalance || 0) : (bd.lastReport?.currentBalance || 0);
+        }
+        totalManagerRev += bd.tRev;
+        totalManagerExp += bd.tExp;
+        totalManagerBal += bd.tBal;
+    });
+    const totalManagerNet = totalManagerRev - totalManagerExp;
+
+    const summaryBannerHTML = `
+    <div class="official-summary-banner animate-in">
+        <div class="official-summary-item" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: #fff; border:none; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <div class="label" style="color:#fff; font-weight:800;">مجموع ايراد اليوم</div>
+            <div class="value" style="color:#fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatNumber(totalManagerRev)}</div>
+        </div>
+        <div class="official-summary-item" style="background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%); color: #fff; border:none; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <div class="label" style="color:#fff; font-weight:800;">مجموع منصرف</div>
+            <div class="value" style="color:#fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatNumber(totalManagerExp)}</div>
+        </div>
+        <div class="official-summary-item" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; border:none; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <div class="label" style="color:#fff; font-weight:800;">صافي ايراد اليوم</div>
+            <div class="value" style="color:#fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatNumber(totalManagerNet)}</div>
+        </div>
+        <div class="official-summary-item highlight" style="background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: #fff; border:none; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            <div class="label" style="color:#fff !important; font-weight:800; opacity:1;">إجمالي الرصيد الحالي</div>
+            <div class="value" style="color:#fff !important; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatNumber(totalManagerBal)}</div>
+        </div>
+    </div>`;
+
     const branchesGridHTML = `
     <div class="page-header animate-in" style="margin-top:12px;">
-        <h2 style="font-size:18px;">📊 بيانات ${selectedBranchName}</h2>
+        <h2 style="font-size:18px;">📊 بيانات الفروع (نظرة عامة)</h2>
     </div>
     <div class="branches-grid" style="margin-bottom:30px;">
         ${branchData.map((bd, i) => `
-        <div class="branch-card animate-in" style="animation-delay:${i*0.07}s">
-            <div class="branch-card-top" style="background: linear-gradient(135deg, ${bd.branch.color} 0%, ${bd.branch.color}cc 100%);">
-                <div class="branch-name">${bd.branch.name}</div>
-                <div class="branch-location">📍 ${bd.branch.city} ${bd.bManager ? '· مديرة: ' + bd.bManager.name : ''}</div>
+        <div class="official-dashboard-card animate-in" style="animation-delay:${i*0.07}s; border:1px solid rgba(0,0,0,0.05); box-shadow:0 6px 15px rgba(0,0,0,0.05);">
+            <div class="official-card-header" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border-bottom:none;">
+                <div class="name" style="color:#fff;">${bd.branch.name}</div>
+                <div class="loc" style="color:rgba(255,255,255,0.8);">📍 ${bd.branch.city} ${bd.bManager ? '· مديرة: ' + bd.bManager.name : ''}</div>
             </div>
-            <div class="branch-card-body">
-                <div class="branch-stat-row">
-                    <span class="bsr-label">الإيرادات</span>
-                    <span class="bsr-val" style="color:#27ae60;">${formatNumber(bd.bRev)} ج.م</span>
+            <div class="official-card-body">
+                <div class="official-stat-row">
+                    <span class="official-stat-label">مجموع الإيراد اليوم</span>
+                    <span class="official-stat-value">${formatNumber(bd.tRev)} ج.م</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">المصروفات</span>
-                    <span class="bsr-val" style="color:#e74c3c;">${formatNumber(bd.bExp)} ج.م</span>
+                <div class="official-stat-row">
+                    <span class="official-stat-label">مجموع المنصرف اليوم</span>
+                    <span class="official-stat-value">${formatNumber(bd.tExp)} ج.م</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">الصافي</span>
-                    <span class="bsr-val" style="color:var(--primary);font-weight:900;">${formatNumber(bd.bRev - bd.bExp)} ج.م</span>
+                <div class="official-stat-row">
+                    <span class="official-stat-label">الصافي النهائي اليوم</span>
+                    <span class="official-stat-value" style="color:var(--primary) !important;">${formatNumber(bd.tRev - bd.tExp)} ج.م</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">الاتصالات</span>
-                    <span class="bsr-val">${bd.bCalls}</span>
+                <div class="official-stat-row">
+                    <span class="official-stat-label">السكرتارية المختصة</span>
+                    <span class="official-stat-value" style="font-size:13px;">${bd.bSecretaries.map(s => s.name).join(' · ') || '—'}</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">الحجوزات</span>
-                    <span class="bsr-val">${bd.bBookings}</span>
+                <div class="official-stat-row" style="background:#fdf5e6; border-top: 1px solid #000;">
+                    <span class="official-stat-label">الرصيد الفعلي الحالي</span>
+                    <span class="official-stat-value" style="color:#b20000 !important;">${formatNumber(bd.tBal)} ج.م</span>
                 </div>
-                <div class="branch-stat-row">
-                    <span class="bsr-label">التقارير</span>
-                    <span class="bsr-val">${bd.bReports.length} تقرير</span>
-                </div>
-                <div class="branch-stat-row" style="border-bottom:none;">
-                    <span class="bsr-label">السكرتارية</span>
-                    <span class="bsr-val" style="font-size:12px;">${bd.bSecretaries.map(s => s.name).join(' · ') || '—'}</span>
-                </div>
-                ${bd.lastReport ? `<div class="branch-stat-row" style="border-bottom:none;padding-top:12px;border-top:1px dashed var(--border-color);margin-top:4px;">
-                    <span class="bsr-label">آخر تقرير</span>
-                    <span class="bsr-val" style="font-size:12px;">${bd.lastReport.date}</span>
-                </div>` : ''}
             </div>
         </div>`).join('')}
     </div>`;
@@ -909,8 +1018,7 @@ function renderManagerDashboard(el) {
             <h1>مرحباً ${AppState.managerName} 👋</h1>
             <p>استعراض التقارير اليومية للفروع</p>
         </div>
-    </div>
-
+    ${summaryBannerHTML}
     ${branchesGridHTML}
 
     <div class="section-card animate-in">
@@ -959,21 +1067,23 @@ window.searchManagerReport = function() {
     const branchKey = document.getElementById('mBranchFilter').value;
     const res = document.getElementById('mReportResult');
 
-    if (branchKey === 'all') {
-        const reports = AppState.reports.filter(r => r.date === date);
-        if (reports.length === 0) {
-            res.innerHTML = `
-            <div class="empty-state animate-in">
-                <span class="empty-icon">❌</span>
-                <p>لا توجد تقارير مسجلة لهذا التاريخ لجميع الفروع</p>
-            </div>`;
-            return;
-        }
+    const reports = (branchKey === 'all') 
+        ? AppState.reports.filter(r => r.date === date)
+        : AppState.reports.filter(r => r?.branch === branchKey && r.date === date);
 
-        const totalRev = reports.reduce((s, r) => s + (r.morning.revenue || 0) + (r.evening.revenue || 0), 0);
-        const totalExp = reports.reduce((s, r) => s + r.expenses.reduce((x, e) => x + Number(e.amount || 0), 0), 0);
-        const totalCals = reports.reduce((s, r) => s + (r.morning.calls || 0) + (r.evening.calls || 0), 0);
-        const totalBucks = reports.reduce((s, r) => s + (r.morning.bookings || 0) + (r.evening.bookings || 0), 0);
+    if (reports.length === 0) {
+        res.innerHTML = `
+        <div class="empty-state animate-in">
+            <span class="empty-icon">❌</span>
+            <p>لا توجد تقارير مسجلة لهذا التاريخ ${branchKey === 'all' ? 'لجميع الفروع' : 'للفرع المحدد'}</p>
+        </div>`;
+        return;
+    }
+
+    if (branchKey === 'all') {
+        const totalRev = reports.reduce((s, r) => s + (r?.financials?.dailyInflow || 0), 0);
+        const totalExp = reports.reduce((s, r) => s + (r?.financials?.dailyOutflow || 0), 0);
+        const totalBucks = reports.reduce((s, r) => s + (r?.morning?.bookings || 0) + (r?.evening?.bookings || 0), 0);
 
         res.innerHTML = `
         <div class="summary-grid animate-in" style="margin-bottom:20px;">
@@ -994,93 +1104,117 @@ window.searchManagerReport = function() {
                 <div class="card-value" style="font-size:20px;">${totalBucks} <span style="font-size:12px;">حجز</span></div>
             </div>
         </div>
-
-        <div class="section-card animate-in">
-            <div class="section-card-header">
-                <div class="header-icon morning">📊</div>
-                <h3>تفاصيل الفروع لليوم (${arabicDate(date)})</h3>
-            </div>
-            <div class="section-card-body table-wrapper">
-                <table>
-                    <thead>
-                        <tr><th>الفرع</th><th>الإيراد</th><th>المصروف</th><th>الصافي</th><th>اتصالات</th><th>حجوزات</th><th>أخرى</th></tr>
-                    </thead>
-                    <tbody>
-                        ${reports.map(r => {
-                            const b = BRANCHES[r.branch];
-                            const rev = (r.morning.revenue || 0) + (r.evening.revenue || 0);
-                            const exp = r.expenses.reduce((s, e) => s + Number(e.amount || 0), 0);
-                            return `
-                            <tr>
-                                <td style="font-weight:700; color:${b?.color || 'inherit'};">${b?.name || r.branch}</td>
-                                <td class="amount-cell primary">${formatNumber(rev)}</td>
-                                <td class="amount-cell expense">${formatNumber(exp)}</td>
-                                <td class="amount-cell success">${formatNumber(rev - exp)}</td>
-                                <td>${(r.morning.calls || 0) + (r.evening.calls || 0)}</td>
-                                <td>${(r.morning.bookings || 0) + (r.evening.bookings || 0)}</td>
-                                <td style="font-size:11px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${r.cancellations || '—'}</td>
-                            </tr>`;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
+        <div style="display:flex; flex-direction:column; gap:40px; padding-bottom:50px;">
+            ${reports.map(report => renderOfficialTable(report)).join('')}
         </div>`;
-        return;
+    } else {
+        res.innerHTML = reports.map(report => renderOfficialTable(report)).join('');
     }
+};
 
-    const report = AppState.reports.find(r => r.date === date && r.branch === branchKey);
-
-    if (!report) {
-        res.innerHTML = `
-        <div class="empty-state animate-in">
-            <span class="empty-icon">❌</span>
-            <p>لا يوجد تقرير مسجل لهذا اليوم في هذا الفرع</p>
-        </div>`;
-        return;
-    }
-
-    const branch = BRANCHES[branchKey];
-    res.innerHTML = `
-    <div class="section-card animate-in" style="border-top:4px solid ${branch.color};">
-        <div class="section-card-header" style="justify-content:space-between;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <div class="header-icon" style="background:${branch.color}22; color:${branch.color};">🏢</div>
-                <h3>تقرير ${branch.name} — ${arabicDate(date)}</h3>
-            </div>
-            <span class="badge badge-morning">عرض فقط</span>
+window.renderOfficialTable = function(report) {
+    const b = BRANCHES[report.branch] || { name: 'فرع مجهول', color: '#b20000', city: '—' };
+    const morningSecs = report.morning?.secretaries || [];
+    const eveningSecs = report.evening?.secretaries || [];
+    
+    return `
+    <div class="official-report-container animate-in" style="background:var(--bg-card); border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.08); overflow:hidden; border:1px solid rgba(0,0,0,0.05); margin-bottom: 25px;">
+        <!-- HEADER -->
+        <div class="official-header-red" style="font-size:20px; padding:15px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border:none; color:#fff;">
+            تقرير فرع (( ${b.name} يوم ${report.dayName || new Date(report.date).toLocaleDateString('ar-EG', { weekday: 'long' })} ${report.date} ))
         </div>
-        <div class="section-card-body">
-            <div class="content-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
-                <!-- Morning Shift -->
-                <div class="info-list" style="background:var(--bg-main); padding:15px; border-radius:var(--radius-sm); border-right:3px solid #f1c40f;">
-                    <h4 style="margin-bottom:12px; color:#f39c12;">☀️ الفترة الصباحية</h4>
-                    <div class="info-row"><span class="lbl">السكرتارية</span><span class="val">موظف مختص</span></div>
-                    <div class="info-row"><span class="lbl">فتح/غلق</span><span class="val">${report.morning.openTime} - ${report.morning.closeTime}</span></div>
-                    <div class="info-row"><span class="lbl">الاتصالات</span><span class="val">${report.morning.calls}</span></div>
-                    <div class="info-row"><span class="lbl">الحجوزات</span><span class="val">${report.morning.bookings}</span></div>
-                    <div class="info-row"><span class="lbl">الإيراد</span><span class="val primary">${formatNumber(report.morning.revenue)} ج.م</span></div>
-                </div>
-                <!-- Evening Shift -->
-                <div class="info-list" style="background:var(--bg-main); padding:15px; border-radius:var(--radius-sm); border-right:3px solid #3498db;">
-                    <h4 style="margin-bottom:12px; color:#2980b9;">🌙 الفترة المسائية</h4>
-                    <div class="info-row"><span class="lbl">السكرتارية</span><span class="val">موظف مختص</span></div>
-                    <div class="info-row"><span class="lbl">الاتصالات</span><span class="val">${report.evening.calls}</span></div>
-                    <div class="info-row"><span class="lbl">الحجوزات</span><span class="val">${report.evening.bookings} (${report.evening.bookingNote})</span></div>
-                    <div class="info-row"><span class="lbl">الإيراد</span><span class="val primary">${formatNumber(report.evening.revenue)} ج.م</span></div>
-                </div>
-            </div>
+
+        <!-- MORNING SECTION -->
+        <div class="official-header-red" style="background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); border:none; border-top:1px solid rgba(255,255,255,0.2); color:#fff; font-size:18px;">☀️ الفترة الصباحية</div>
+        <div class="official-full-row" style="background: var(--bg-hover); border:1px solid rgba(0,0,0,0.05); border-top:none;">بداية العمل (فتح المقر) في ${report.morning?.openTime || '10:00'}</div>
+
+        <div class="official-table-grid">
+            <!-- Row 1: Secretaries -->
+            ${morningSecs.length > 0 ? morningSecs.map((s) => `
+                <div class="official-cell" style="text-align:right; padding-right:15px;">السكرتاريه المختصه: ${s.name}</div>
+                <div class="official-cell">${s.start || '-'}</div>
+                <div class="official-cell">${s.end || '-'}</div>
+            `).join('') : `
+                <div class="official-full-row">لا يوجد بيانات سكرتارية صباحية</div>
+            `}
             
-            <div style="margin-top:20px; padding:15px; background:var(--bg-card); border:1px dashed var(--border-color); border-radius:var(--radius-sm);">
-                <h4 style="margin-bottom:10px;">💸 ملخص المالية وجرد الصندوق</h4>
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:15px;">
-                    <div><small>إجمالي الإيراد</small><div style="font-size:18px; font-weight:900; color:var(--primary);">${formatNumber(report.morning.revenue + report.evening.revenue)} ج.م</div></div>
-                    <div><small>إجمالي المصروفات</small><div style="font-size:18px; font-weight:900; color:#e74c3c;">${formatNumber(report.expenses.reduce((s,e)=>s+Number(e.amount||0),0))} ج.م</div></div>
-                    <div><small>صافي اليوم</small><div style="font-size:18px; font-weight:900; color:#27ae60;">${formatNumber((report.morning.revenue + report.evening.revenue) - report.expenses.reduce((s,e)=>s+Number(e.amount||0),0))} <small>ج.م</small></div></div>
-                    <div><small>رصيد الخزنة</small><div style="font-size:18px; font-weight:900; color:#3498db;">${formatNumber(report.currentBalance)} <small>ج.م</small></div></div>
-                </div>
-            </div>
+            <!-- Row 2: Stats -->
+            <div class="official-cell">عدد الاتصالات : ${report.morning?.calls || 0}</div>
+            <div class="official-cell">حجوزات الفتره الصباحيه : ${report.morning?.bookings || 0}</div>
+            <div class="official-cell" style="background:#fdf5e6;">ايراد الفترة الصباحية : ${formatNumber(report.morning?.inflow || 0)}</div>
         </div>
-    </div>`;
+
+        <!-- EVENING SECTION -->
+        <div class="official-header-red" style="background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%); border:none; color:#fff; font-size:18px;">🌙 الفترة المسائية</div>
+        <div class="official-full-row" style="background: var(--bg-hover); border:1px solid rgba(0,0,0,0.05); border-top:none;">نهاية العمل (اغلاق المقر) في ${report.evening?.closeTime || '22:00'}</div>
+
+        <div class="official-table-grid">
+            <!-- Row 1: Secretaries -->
+            ${eveningSecs.length > 0 ? eveningSecs.map((s) => `
+                <div class="official-cell" style="text-align:right; padding-right:15px;">السكرتاريه المختصه:${s.name}</div>
+                <div class="official-cell">${s.start || '-'}</div>
+                <div class="official-cell">${s.end || '-'}</div>
+            `).join('') : `
+                <div class="official-full-row">لا يوجد بيانات سكرتارية مسائية</div>
+            `}
+            
+            <!-- Row 2: Stats -->
+            <div class="official-cell">عدد الاتصالات: ${report.evening?.calls || 0}</div>
+            <div class="official-cell">عدد حجوزات الفتره المسائيه: ${report.evening?.bookings || 0}</div>
+            <div class="official-cell">ايراد الفترة المسائيه: ${formatNumber(report.evening?.inflow || 0)}</div>
+        </div>
+
+        <!-- TEACHER BOOKINGS -->
+        <div class="official-full-row" style="background:#fcebe1;">
+            حجوزات خاصة لمدرس : ${report.teacherBookings || '-'}
+        </div>
+
+        <!-- FINANCIAL SUMMARY -->
+        <div class="official-table-grid" style="border:1px solid rgba(0,0,0,0.05);">
+            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border:none; color:#fff;">مجموع ايراد اليوم:</div>
+            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%); border:none; border-right:1px solid rgba(0,0,0,0.05); color:#fff;">مجموع منصرف:</div>
+            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border:none; border-right:1px solid rgba(0,0,0,0.05); color:#fff;">صافي ايراد اليوم:</div>
+            
+            <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#11998e; border:none; border-top:1px solid rgba(0,0,0,0.05);">${formatNumber(report.financials?.dailyInflow || 0)}</div>
+            <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#cb2d3e; border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">${formatNumber(report.financials?.dailyOutflow || 0)}</div>
+            <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#1e3c72; border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">${formatNumber(report.financials?.totalNet || 0)}</div>
+        </div>
+
+        <!-- BALANCE BAR -->
+        <div class="official-header-red" style="margin-top:2px; font-size:22px; background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); border:none; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,0.2);">
+            الحالي : ${formatNumber(report.currentBalance || 0)}
+        </div>
+
+        <!-- EXPENSE TABLE -->
+        <div class="official-table-grid" style="border:1px solid rgba(0,0,0,0.05);">
+            <div class="official-cell" style="background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%); color:#fff; border:none; font-size:16px;">المنصرف</div>
+            <div class="official-cell" style="background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%); color:#fff; border:none; border-right:1px solid rgba(255,255,255,0.2); font-size:16px;">نوعه</div>
+            <div class="official-cell" style="background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%); color:#fff; border:none; border-right:1px solid rgba(255,255,255,0.2); font-size:16px;">المستفيد</div>
+            
+            ${(report.financials?.outflowList || []).length > 0 ? (report.financials.outflowList.map(item => `
+                <div class="official-cell" style="background:var(--bg-card); border:none; border-top:1px solid rgba(0,0,0,0.05); color:#cb2d3e;">${formatNumber(item.amount)}</div>
+                <div class="official-cell" style="background:var(--bg-card); border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">${item.statement}</div>
+                <div class="official-cell" style="background:var(--bg-card); border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">-</div>
+            `).join('')) : `
+                <div class="official-full-row" style="color:var(--text-muted); font-style:italic; background:var(--bg-card); border:none; border-top:1px dashed rgba(0,0,0,0.1);">لا يوجد منصرفات تفصيلية</div>
+            `}
+        </div>
+
+        <!-- FOOTER -->
+        <div class="official-header-red" style="background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%); border:none; color:#fff;">الغيابات والالغاءات</div>
+        <div class="official-table-grid">
+             <div class="official-cell" style="background:#fdf5e6;">المدرس</div>
+             <div class="official-cell" style="background:#fdf5e6;">عدد المجموعات الملغاه</div>
+             <div class="official-cell" style="background:#fdf5e6;">سبب الالغاء</div>
+             
+             <div class="official-full-row" style="background:#fff; font-size:13px;">${report.cancellations || 'لا يوجد جروبات ملغيه علي مدار اليوم'}</div>
+        </div>
+        
+        <div class="official-cell" style="grid-column:span 3; background:#fdf5e6; border-top:none; border-bottom:3px solid #000; font-size:18px;">
+            كتابه التقرير : ${report.evening?.reportedBy || report.morning?.secretaries?.[0]?.name || '—'}
+        </div>
+    </div>
+    `;
 };
 
 // -------------------------
@@ -1097,237 +1231,594 @@ window.updateManagerName = function() {
 // -------------------------
 // Page: Daily Report Form
 // -------------------------
-function renderReport(el) {
-    const latestReport = AppState.reports[AppState.reports.length - 1];
+function renderReport(el, existingData = null) {
+    // Auto-detect existing report for today if none passed
+    if (!existingData) {
+        const branchKey = AppState.userBranch || 'soyouf';
+        const todayDate = today();
+        existingData = AppState.reports.find(r => r.branch === branchKey && r.date === todayDate) || null;
+    }
+    const data = existingData || {};
+    const morning = data.morning || {};
+    const evening = data.evening || {};
+    const financials = data.financials || {};
 
     el.innerHTML = `
-    <div class="page-header animate-in">
-        <h1>📝 التقرير اليومي</h1>
-        <p>إدخال بيانات الفترات الصباحية والمسائية</p>
-    </div>
-
-    <!-- Morning Shift -->
-    <div class="form-section animate-in">
-        <div class="form-section-header">☀️ الفترة الصباحية</div>
-        <div class="form-section-body">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="morningSecretary">السكرتارية المختصة</label>
-                    <select id="morningSecretary">
-                        ${EMPLOYEES.filter(e => e.branch === (AppState.userBranch || 'soyouf'))
-                            .map(e => `<option value="${e.name}">${e.name}</option>`).join('') || '<option value="">لا يوجد موظفين مسجلين</option>'}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="morningOpenTime">وقت الفتح</label>
-                    <input type="time" id="morningOpenTime" value="12:00">
-                </div>
-                <div class="form-group">
-                    <label for="morningCloseTime">وقت الإغلاق</label>
-                    <input type="time" id="morningCloseTime" value="19:00">
-                </div>
-                <div class="form-group">
-                    <label for="morningCalls">عدد الاتصالات</label>
-                    <input type="text" inputmode="numeric" id="morningCalls" oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g,'')" value="">
-                </div>
-                <div class="form-group">
-                    <label for="morningBookings">عدد الحجوزات</label>
-                    <input type="text" inputmode="numeric" id="morningBookings" oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g,'')" value="">
-                </div>
-                <div class="form-group">
-                    <label for="morningRevenue">الإيراد (ج.م)</label>
-                    <input type="text" inputmode="decimal" id="morningRevenue" placeholder="0" oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')" value="">
+    <!-- Report Metadata Top-Header (Glassmorphism Style) -->
+    <div class="report-meta-header animate-in" style="margin-bottom:30px; background:var(--bg-card); border:1px solid var(--border-color); border-radius:20px; padding:20px; box-shadow:var(--shadow-md); position:relative; overflow:hidden;">
+         <!-- Vertical Title Accent -->
+         <div style="position:absolute; right:0; top:0; bottom:0; width:4px; background:var(--gradient-primary);"></div>
+         
+         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:20px; align-items:flex-end;">
+            <div class="form-group">
+                <label>الفرع</label>
+                ${AppState.userRole === 'branch' 
+                    ? `<div style="padding:12px; background:var(--bg-input); border-radius:12px; font-weight:bold; color:var(--primary); font-size:16px;">${BRANCHES[AppState.userBranch]?.name}</div>
+                       <input type="hidden" id="branchSelect2" value="${AppState.userBranch}">`
+                    : `<select id="branchSelect2" style="padding:12px; border-radius:12px;">
+                        ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}" ${k===(data.branch || AppState.userBranch || 'soyouf')?'selected':''}>${v.name}</option>`).join('')}
+                       </select>`
+                }
+            </div>
+            <div class="form-group">
+                <label>التاريخ</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="date" id="reportDate" value="${data.date || today()}" style="padding:12px; border-radius:12px; flex:1;">
+                    <button class="official-btn" onclick="reloadReportByDate()" title="مزامنة بيانات التاريخ المحدد" style="padding:12px; width:45px; height:45px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:var(--primary); color:#fff; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+                        🔄
+                    </button>
+                    <button class="official-btn" onclick="reloadReportByDate(true)" title="العودة لليوم" style="padding:12px; width:45px; height:45px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:var(--accent); color:#fff; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+                        🏠
+                    </button>
                 </div>
             </div>
-        </div>
+            <div class="form-group">
+                <label>الرصيد الفعلي بالخزنة (ج.م)</label>
+                <input type="text" id="currentBalance" readonly value="${data.currentBalance || financials.totalNet || '0'}" style="padding:12px; border-color:var(--primary); font-weight:900; font-size:18px; background:rgba(41,128,185,0.05) !important; cursor:not-allowed; border-radius:12px;">
+            </div>
+            <div class="form-group">
+                <label>حرر التقرير بواسطة</label>
+                <select id="reportedBy" style="padding:12px; border-radius:12px; font-weight:bold; color:var(--primary);">
+                    <option value="">اختر الاسم...</option>
+                </select>
+            </div>
+         </div>
     </div>
 
-    <!-- Evening Shift -->
-    <div class="form-section animate-in">
-        <div class="form-section-header">🌙 الفترة المسائية</div>
-        <div class="form-section-body">
-            <div class="form-grid">
-                <div class="form-group" style="grid-column: 1/-1;">
-                    <label for="eveningSecretariesList">السكرتارية المختصة (الفترة المسائية)</label>
-                    <div id="eveningSecretaries" style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
-                        <!-- Rows added via addSecretaryRow -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:25px;">
+        <!-- Morning Shift Masterpiece -->
+        <div class="official-dashboard-card shift-card animate-in" style="border:none; background:var(--bg-card); box-shadow:0 10px 30px rgba(0,0,0,0.08); overflow:visible; border-radius:20px;">
+            <div class="shift-pill-header morning-pill" style="background:linear-gradient(135deg, #f39c12, #e67e22); padding:14px 30px; border-radius:100px; margin:15px 15px 0; text-align:center; font-weight:900; font-size:17px; color:#fff; box-shadow:0 6px 20px rgba(243,156,18,0.4); letter-spacing:0.5px;">
+                ☀️ الفترة الصباحية
+            </div>
+            <div class="official-card-body" style="padding:25px;">
+                <div class="form-group">
+                    <label>السكرتارية المتواجدة</label>
+                    <div id="morningSecretaryChecklist" class="secretary-checklist"></div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:20px;">
+                    <div class="form-group">
+                        <label>وقت الفتح</label>
+                        <input type="time" id="morningOpenTime" value="${morning.openTime || '10:00'}">
                     </div>
-                    <button class="btn-add-row" onclick="addSecretaryRow()">+ إضافة سكرتارية</button>
+                    <div class="form-group">
+                        <label>وقت الإغلاق</label>
+                        <input type="time" id="morningCloseTime" value="${morning.closeTime || '18:00'}">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="eveningCalls">عدد الاتصالات</label>
-                    <input type="number" id="eveningCalls" min="0" value="">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+                    <div class="form-group">
+                        <label>عدد الاتصالات</label>
+                        <input type="text" inputmode="numeric" id="morningCalls" oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g,'')" value="${morning.calls || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>الحجوزات</label>
+                        <input type="text" inputmode="numeric" id="morningBookings" oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g,'')" value="${morning.bookings || ''}">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="eveningBookings">عدد الحجوزات</label>
-                    <input type="number" id="eveningBookings" min="0" value="">
+                <div class="form-group" style="margin-top:12px;">
+                    <label>ملاحظات (الصباحية)</label>
+                    <input type="text" id="morningBookingNote" class="compact-input" placeholder="مثال: كورس PH1" value="${morning.bookingNote || ''}">
                 </div>
-                <div class="form-group">
-                    <label for="eveningBookingNote">ملاحظة الحجوزات</label>
-                    <input type="text" id="eveningBookingNote" placeholder="مثال: كورس PH1" value="">
+                
+                <div style="margin-top:25px; border-top: 2px dashed rgba(0,0,0,0.05); padding-top:20px;">
+                    <div style="background:linear-gradient(135deg, #11998e, #38ef7d); padding:12px 20px; color:#fff; border-radius:100px; margin-bottom:15px; font-weight:800; font-size:15px; text-align:center; box-shadow:0 4px 15px rgba(17,153,142,0.3);">📥 وارد الصباح (دخول)</div>
+                    <div id="morningInflowRows" class="transaction-list inflow-list"></div>
+                    <button class="btn btn-add-row inflow" style="padding:10px; margin-bottom:20px; width:100%; border-radius:100px; font-weight:bold; background:rgba(17,153,142,0.1); color:#11998e; border:1px dashed #11998e;" onclick="addInflowRow('morningInflowRows')">+ إضافة وارد صباحي</button>
+
+                    <div style="background:linear-gradient(135deg, #cb2d3e, #ef473a); padding:12px 20px; color:#fff; border-radius:100px; margin-bottom:15px; font-weight:800; font-size:15px; text-align:center; box-shadow:0 4px 15px rgba(203,45,62,0.3);">📤 منصرف الصباح (خروج)</div>
+                    <div id="morningOutflowRows" class="transaction-list outflow-list"></div>
+                    <button class="btn btn-add-row outflow" style="padding:10px; width:100%; border-radius:100px; font-weight:bold; background:rgba(203,45,62,0.1); color:#cb2d3e; border:1px dashed #cb2d3e;" onclick="addOutflowRow('morningOutflowRows')">+ إضافة منصرف صباحي</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Evening Shift Masterpiece -->
+        <div class="official-dashboard-card shift-card animate-in" style="border:none; background:var(--bg-card); box-shadow:0 10px 30px rgba(0,0,0,0.08); overflow:visible; border-radius:20px;">
+            <div class="shift-pill-header evening-pill" style="background:linear-gradient(135deg, #2980b9, #1a5276); padding:14px 30px; border-radius:100px; margin:15px 15px 0; text-align:center; font-weight:900; font-size:17px; color:#fff; box-shadow:0 6px 20px rgba(41,128,185,0.4); letter-spacing:0.5px;">
+                🌙 الفترة المسائية
+            </div>
+            <div class="official-card-body" style="padding:25px;">
                 <div class="form-group">
-                    <label for="eveningRevenue">الإيراد (ج.م)</label>
-                    <input type="number" id="eveningRevenue" min="0" placeholder="0" value="">
+                    <label>السكرتارية المتواجدة</label>
+                    <div id="eveningSecretaryChecklist" class="secretary-checklist"></div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:20px;">
+                    <div class="form-group">
+                        <label>وقت الفتح</label>
+                        <input type="time" id="eveningOpenTime" value="${evening.openTime || '14:00'}">
+                    </div>
+                    <div class="form-group">
+                        <label>وقت الإغلاق</label>
+                        <input type="time" id="eveningCloseTime" value="${evening.closeTime || '22:00'}">
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+                    <div class="form-group">
+                        <label>عدد الاتصالات</label>
+                        <input type="text" inputmode="numeric" id="eveningCalls" oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g,'')" value="${evening.calls || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>الحجوزات</label>
+                        <input type="text" inputmode="numeric" id="eveningBookings" oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9]/g,'')" value="${evening.bookings || ''}">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label>ملاحظات (المسائية)</label>
+                    <input type="text" id="eveningBookingNote" class="compact-input" placeholder="مثال: كورس PH1" value="${evening.bookingNote || ''}">
+                </div>
+                
+                <div style="margin-top:25px; border-top: 2px dashed rgba(0,0,0,0.05); padding-top:20px;">
+                    <div style="background:linear-gradient(135deg, #11998e, #38ef7d); padding:12px 20px; color:#fff; border-radius:100px; margin-bottom:15px; font-weight:800; font-size:15px; text-align:center; box-shadow:0 4px 15px rgba(17,153,142,0.3);">📥 وارد المساء (دخول)</div>
+                    <div id="eveningInflowRows" class="transaction-list inflow-list"></div>
+                    <button class="btn btn-add-row inflow" style="padding:10px; margin-bottom:20px; width:100%; border-radius:100px; font-weight:bold; background:rgba(17,153,142,0.1); color:#11998e; border:1px dashed #11998e;" onclick="addInflowRow('eveningInflowRows')">+ إضافة وارد مسائي</button>
+
+                    <div style="background:linear-gradient(135deg, #cb2d3e, #ef473a); padding:12px 20px; color:#fff; border-radius:100px; margin-bottom:15px; font-weight:800; font-size:15px; text-align:center; box-shadow:0 4px 15px rgba(203,45,62,0.3);">📤 منصرف المساء (خروج)</div>
+                    <div id="eveningOutflowRows" class="transaction-list outflow-list"></div>
+                    <button class="btn btn-add-row outflow" style="padding:10px; width:100%; border-radius:100px; font-weight:bold; background:rgba(203,45,62,0.1); color:#cb2d3e; border:1px dashed #cb2d3e;" onclick="addOutflowRow('eveningOutflowRows')">+ إضافة منصرف مسائي</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Expenses -->
-    <div class="form-section animate-in">
-        <div class="form-section-header">💸 المنصرفات</div>
-        <div class="form-section-body">
-            <div class="expense-rows" id="expenseRows">
-                <div class="expense-row">
-                    <input type="text" placeholder="المستفيد" value="">
-                    <input type="text" placeholder="السبب / النوع" value="">
-                    <input type="text" inputmode="decimal" placeholder="المبلغ" oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')" value="">
-                    <button class="btn-remove" onclick="this.closest('.expense-row').remove()">✕</button>
-                </div>
-            </div>
-            <button class="btn-add-row" onclick="addExpenseRow()">+ إضافة مصروف</button>
-        </div>
-    </div>
+    <!-- Combined Statements logic has been integrated above into Morning and Evening shifts -->
 
-    <!-- Teacher Bookings & Cancellations -->
-    <div class="form-section animate-in">
-        <div class="form-section-header">📋 الغيابات والإلغاءات</div>
-        <div class="form-section-body">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="teacherBookings">حجوزات خاصة لمدرس</label>
-                    <textarea id="teacherBookings" placeholder="أدخل تفاصيل حجوزات المدرسين إن وجدت..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="cancellations">الغيابات والإلغاءات</label>
-                    <textarea id="cancellations" placeholder="أدخل تفاصيل الغيابات والإلغاءات..."></textarea>
-                </div>
+    <div class="official-dashboard-card animate-in" style="margin-top:25px; border:none; background:#fff;">
+         <div class="official-card-header" style="background:linear-gradient(90deg, #34495e, #2c3e50); padding:12px 20px;">
+            <div class="name" style="color:#fff; font-size:16px;">📋 ملاحظات المدرسين والغيابات</div>
+        </div>
+        <div class="official-card-body" style="padding:20px; display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+            <div class="form-group">
+                <label>حجوزات خاصة لمدرس</label>
+                <textarea id="teacherBookings" placeholder="تفاصيل حجوزات المدرسين...">${data.teacherBookings || ''}</textarea>
+            </div>
+            <div class="form-group">
+                <label>الغيابات والإلغاءات</label>
+                <textarea id="cancellations" placeholder="تفاصيل الغيابات والإلغاءات...">${data.cancellations || ''}</textarea>
             </div>
         </div>
     </div>
 
-    <!-- Balance -->
-    <div class="form-section animate-in">
-        <div class="form-section-header">🏦 الرصيد الحالي</div>
-        <div class="form-section-body">
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="branchSelect2">الفرع</label>
-                    ${AppState.userRole === 'branch' 
-                        ? `<div style="padding:10px 14px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:var(--radius-sm); font-weight:bold; color:var(--primary);">${BRANCHES[AppState.userBranch]?.name}</div>
-                           <input type="hidden" id="branchSelect2" value="${AppState.userBranch}">`
-                        : `<select id="branchSelect2">
-                            ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}" ${k===(AppState.userBranch||'soyouf')?'selected':''}>${v.name}</option>`).join('')}
-                           </select>`
-                    }
-                </div>
-                <div class="form-group">
-                    <label for="reportDate">التاريخ</label>
-                    <input type="date" id="reportDate" value="${today()}">
-                </div>
-                <div class="form-group">
-                    <label for="currentBalance">الرصيد الحالي (ج.م)</label>
-                    <input type="text" inputmode="decimal" id="currentBalance" oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')" value="">
-                </div>
+    <!-- Financial Masterpiece Card -->
+    <div class="financial-summary-card animate-in" style="margin-top:25px; background:linear-gradient(135deg, #001f3f 0%, #004d40 100%);">
+        <div class="summary-title-bar" style="background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1);">
+            💰 ملخص مالية اليوم بالكامل
+        </div>
+        <div class="summary-grid">
+            <div class="summary-box prev-balance-box" style="background:linear-gradient(135deg, rgba(243,156,18,0.2), rgba(230,126,34,0.1)); border:2px solid rgba(243,156,18,0.5); border-radius:16px; box-shadow:0 0 20px rgba(243,156,18,0.15); position:relative;">
+                <span class="label" style="color:#ffd93d; font-weight:700;">✏️ الرصيد السابق (المتبقي من أمس)</span>
+                <input type="text" inputmode="decimal" id="previousBalance" placeholder="اكتب المبلغ هنا..." 
+                       oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); calculateGlobalBalance();" 
+                       style="width: 100%; border: none; background: transparent; text-align: center; font-size: 28px; font-weight: 900; color: #ffd93d; outline: none; cursor:text;" 
+                       value="${financials.previousBalance || ''}">
+                <div style="text-align:center; font-size:11px; color:rgba(255,217,61,0.5); margin-top:4px;">⬆ اضغط هنا للإدخال</div>
             </div>
+            <div class="summary-box inflow-box" style="background:rgba(39,174,96,0.15); border:1px solid rgba(39,174,96,0.3);">
+                <span class="label" style="color:#2ecc71;">إجمالي الوارد (محسوب)</span>
+                <input type="text" id="dailyInflow" readonly 
+                       style="width: 100%; border: none; background: transparent; text-align: center; font-size: 28px; font-weight: 900; color: #2ecc71; outline: none;" 
+                       value="${financials.dailyInflow || '0'}">
+            </div>
+            <div class="summary-box outflow-box" style="background:rgba(231,76,60,0.15); border:1px solid rgba(231,76,60,0.3);">
+                <span class="label" style="color:#ff7675;">إجمالي المنصرف (محسوب)</span>
+                <input type="text" id="dailyOutflow" readonly 
+                       style="width: 100%; border: none; background: transparent; text-align: center; font-size: 28px; font-weight: 900; color: #ff7675; outline: none;" 
+                       value="${financials.dailyOutflow || '0'}">
+            </div>
+        </div>
+        <div class="net-balance-container" style="background:rgba(255,255,255,0.05);">
+            <div class="net-balance-label" style="opacity:0.8; font-size:14px;">📊 الصافي النهائي لليوم (شامل الرصيد السابق)</div>
+            <div class="net-balance-highlight" id="totalDailyNetDisplay" style="text-shadow:0 0 20px rgba(0,229,255,0.5);">
+                ${formatNumber(financials.totalNet || 0)}
+            </div>
+            <input type="hidden" id="totalDailyNet" value="${financials.totalNet || '0'}">
         </div>
     </div>
 
-    <div class="form-actions animate-in">
-        <button class="btn btn-primary" onclick="saveReport()">💾 حفظ التقرير</button>
-        <button class="btn btn-outline" onclick="navigate('dashboard')">↩ العودة</button>
+    <!-- Submission and Actions -->
+    <div class="form-actions animate-in" style="margin-top:40px; display:flex; flex-direction:column; align-items:center; gap:20px;">
+        <button class="btn btn-primary" onclick="saveReport()" style="padding:18px 80px; border-radius:100px; font-size:20px; font-weight:bold; box-shadow:0 10px 30px rgba(0,96,100,0.3); background:var(--gradient-primary); border:none; color:#fff;">
+            💾 ${existingData ? 'تحديث التقرير النهائي' : 'حفظ وإرسال التقرير'}
+        </button>
+        <button class="btn btn-outline" onclick="navigate('dashboard')" style="padding:12px 40px; border-radius:100px; border:1px solid var(--border-color); color:var(--text-secondary);">
+            ↩ إلغاء والعودة للوحة التحكم
+        </button>
     </div>
     `;
     
-    // Add initial evening rows
-    const eveningContainer = document.getElementById('eveningSecretaries');
-    if (eveningContainer) {
-        addSecretaryRow();
-        addSecretaryRow();
+    // Initial population
+    const bKey = (AppState.userRole === 'branch') ? AppState.userBranch : document.getElementById('branchSelect2').value;
+    
+    // Set saved value for reporter dropdown first
+    const reporterSelect = document.getElementById('reportedBy');
+    if (reporterSelect) reporterSelect.dataset.savedVal = data.reportedBy || "";
+
+    updateSecretaryLists(bKey, morning.secretaries, evening.secretaries);
+
+    // Restore per-shift inflow/outflow rows
+    const morningInflows = financials.morningInflowList || [];
+    const morningOutflows = financials.morningOutflowList || [];
+    const eveningInflows = financials.eveningInflowList || [];
+    const eveningOutflows = financials.eveningOutflowList || [];
+
+    // Check if we have per-shift data (new format) or legacy global data
+    if (morningInflows.length || eveningInflows.length || morningOutflows.length || eveningOutflows.length) {
+        // New per-shift format
+        if (morningInflows.length) morningInflows.forEach(item => addInflowRow('morningInflowRows', item));
+        else addInflowRow('morningInflowRows');
+        
+        if (eveningInflows.length) eveningInflows.forEach(item => addInflowRow('eveningInflowRows', item));
+        else addInflowRow('eveningInflowRows');
+        
+        if (morningOutflows.length) morningOutflows.forEach(item => addOutflowRow('morningOutflowRows', item));
+        else addOutflowRow('morningOutflowRows');
+        
+        if (eveningOutflows.length) eveningOutflows.forEach(item => addOutflowRow('eveningOutflowRows', item));
+        else addOutflowRow('eveningOutflowRows');
+    } else if (financials.inflowList && financials.inflowList.length > 0) {
+        // Legacy format — dump in morning for backward compatibility
+        financials.inflowList.forEach(item => addInflowRow('morningInflowRows', item));
+        addInflowRow('eveningInflowRows');
+        if (financials.outflowList && financials.outflowList.length > 0) {
+            financials.outflowList.forEach(item => addOutflowRow('morningOutflowRows', item));
+        } else {
+            addOutflowRow('morningOutflowRows');
+        }
+        addOutflowRow('eveningOutflowRows');
+    } else {
+        // Brand new report — one empty row each
+        addInflowRow('morningInflowRows');
+        addInflowRow('eveningInflowRows');
+        addOutflowRow('morningOutflowRows');
+        addOutflowRow('eveningOutflowRows');
+    }
+
+    // Auto-fetch/Sync previous balance
+    const currentLedgerKey = `${bKey}_${data.date || today()}`;
+    const ledger = AppState.ledgers[currentLedgerKey];
+    if (ledger && ledger.previousBalance) {
+        const prevInput = document.getElementById('previousBalance');
+        if (prevInput) {
+            prevInput.value = ledger.previousBalance;
+            calculateGlobalBalance();
+        }
+    } else if (!existingData || !financials.previousBalance) {
+        fetchLastBalance(bKey);
+    }
+
+    // Sync checklists if branch changes
+    const bSel = document.getElementById('branchSelect2');
+    if (bSel) {
+        bSel.addEventListener('change', (e) => updateSecretaryLists(e.target.value));
     }
 }
 
-window.addExpenseRow = function() {
-    const container = document.getElementById('expenseRows');
-    const row = document.createElement('div');
-    row.className = 'expense-row';
-    row.innerHTML = `
-        <input type="text" placeholder="المستفيد">
-        <input type="text" placeholder="السبب / النوع">
-        <input type="number" placeholder="المبلغ">
-        <button class="btn-remove" onclick="this.closest('.expense-row').remove()">✕</button>
-    `;
-    container.appendChild(row);
+window.updateSecretaryLists = function(branchKey, morningData = [], eveningData = []) {
+    const morningContainer = document.getElementById('morningSecretaryChecklist');
+    const eveningContainer = document.getElementById('eveningSecretaryChecklist');
+    if (!morningContainer || !eveningContainer) return;
+
+    const branchStaff = EMPLOYEES.filter(e => e.branch === branchKey);
+    
+    const renderList = (shift) => {
+        const defStart = (shift === 'morning') ? document.getElementById('morningOpenTime').value : document.getElementById('eveningOpenTime').value;
+        const defEnd = (shift === 'morning') ? document.getElementById('morningCloseTime').value : document.getElementById('eveningCloseTime').value;
+        
+        return branchStaff.map(emp => `
+            <div class="presence-card animate-in" onclick="togglePresence(this, '${shift}')">
+                <div class="check-icon">✓</div>
+                <div class="avatar-circle">${emp.name[0]}</div>
+                <div class="emp-name">${emp.name}</div>
+                <div class="emp-role">${emp.role}</div>
+                
+                <div class="card-times" onclick="event.stopPropagation()">
+                    <div class="time-input-group">
+                        <label>الحضور</label>
+                        <input type="time" class="time-in" value="${defStart}">
+                    </div>
+                    <div class="time-input-group">
+                        <label>الانصراف</label>
+                        <input type="time" class="time-out" value="${defEnd}">
+                    </div>
+                </div>
+                <input type="checkbox" style="display:none;" data-name="${emp.name}">
+            </div>
+        `).join('') || '<p style="color:var(--text-secondary); padding:10px;">لا يوجد موظفين مسجلين هذا الفرع</p>';
+    };
+
+    morningContainer.innerHTML = renderList('morning');
+    eveningContainer.innerHTML = renderList('evening');
+
+    // Update 'Reported By' dropdown
+    const reportedBySelect = document.getElementById('reportedBy');
+    if (reportedBySelect) {
+        const currentVal = reportedBySelect.dataset.savedVal || ""; 
+        reportedBySelect.innerHTML = '<option value="">اختر الاسم...</option>' + 
+            branchStaff.map(emp => `<option value="${emp.name}" ${emp.name === currentVal ? 'selected' : ''}>${emp.name}</option>`).join('');
+    }
 };
 
-window.addSecretaryRow = function() {
-    const container = document.getElementById('eveningSecretaries');
-    if (!container) return;
+window.togglePresence = function(el, shift) {
+    el.classList.toggle('active');
+    const cb = el.querySelector('input[type="checkbox"]');
+    if (cb) cb.checked = el.classList.contains('active');
     
-    // Get staff for current branch
-    const branchKey = (AppState.userRole === 'branch') ? AppState.userBranch : document.getElementById('branchSelect2').value;
-    const branchStaff = EMPLOYEES.filter(e => e.branch === branchKey);
-    const options = branchStaff.map(e => `<option value="${e.name}">${e.name}</option>`).join('') || '<option value="">لا يوجد موظفين</option>';
+    // Auto-sync times from shift defaults if becoming active
+    if (el.classList.contains('active')) {
+        const shiftIn = document.getElementById(`${shift}OpenTime`)?.value;
+        const shiftOut = document.getElementById(`${shift}CloseTime`)?.value;
+        if (shiftIn) el.querySelector('.time-in').value = shiftIn;
+        if (shiftOut) el.querySelector('.time-out').value = shiftOut;
+    }
+};
 
+
+window.addInflowRow = function(containerId = 'morningInflowRows', item = {}) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
     const row = document.createElement('div');
-    row.className = 'expense-row';
-    row.style.gridTemplateColumns = '1.2fr 1fr 1fr auto';
+    row.className = 'ledger-row-premium animate-in';
     row.innerHTML = `
-        <select style="padding:10px; border-radius:8px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); font-family:Cairo;">
-            ${options}
-        </select>
-        <input type="time" value="12:00">
-        <input type="time" value="20:00">
-        <button class="btn-remove" onclick="this.closest('.expense-row').remove()">✕</button>
+        <div class="capsule-input capsule-wide">
+            <input type="text" placeholder="بيان الدخول (الوارد)..." value="${item.statement || ''}" oninput="calculateGlobalBalance()">
+        </div>
+        <div class="capsule-input capsule-small inflow-accent">
+            <input type="text" inputmode="decimal" placeholder="المبلغ" value="${item.amount || ''}" 
+                   oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); calculateGlobalBalance()">
+        </div>
+        <button class="btn-remove" style="width:35px; height:35px; flex-shrink:0; border-radius:50%;" onclick="this.closest('.ledger-row-premium').remove(); calculateGlobalBalance();">✕</button>
     `;
     container.appendChild(row);
+    calculateGlobalBalance();
+};
+
+window.addOutflowRow = function(containerId = 'morningOutflowRows', item = {}) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'ledger-row-premium animate-in';
+    row.innerHTML = `
+        <div class="capsule-input capsule-wide">
+            <input type="text" placeholder="بيان الخروج (المنصرف)..." value="${item.statement || ''}" oninput="calculateGlobalBalance()">
+        </div>
+        <div class="capsule-input capsule-small outflow-accent">
+            <input type="text" inputmode="decimal" placeholder="المبلغ" value="${item.amount || ''}" 
+                   oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); calculateGlobalBalance()">
+        </div>
+        <button class="btn-remove" style="width:35px; height:35px; flex-shrink:0; border-radius:50%;" onclick="this.closest('.ledger-row-premium').remove(); calculateGlobalBalance();">✕</button>
+    `;
+    container.appendChild(row);
+    calculateGlobalBalance();
+};
+
+
+
+window.calculateGlobalBalance = function() {
+    const getListSum = (selector) => {
+        return [...document.querySelectorAll(selector)].reduce((sum, row) => {
+            const input = row.querySelector('input[placeholder="المبلغ"]');
+            const val = parseFloat(input?.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0;
+            return sum + val;
+        }, 0);
+    };
+    
+    const inflowTotal = getListSum('.inflow-list .ledger-row-premium');
+    const outflowTotal = getListSum('.outflow-list .ledger-row-premium');
+    const prevBalance = parseFloat(document.getElementById('previousBalance')?.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0;
+    
+    const netTotal = prevBalance + inflowTotal - outflowTotal;
+    
+    // Update data inputs
+    const inEl = document.getElementById('dailyInflow');
+    const outEl = document.getElementById('dailyOutflow');
+    const netEl = document.getElementById('totalDailyNet');
+    
+    if (inEl) inEl.value = inflowTotal;
+    if (outEl) outEl.value = outflowTotal;
+    if (netEl) netEl.value = netTotal;
+    
+    // Update decorative highlights
+    const netDisplay = document.getElementById('totalDailyNetDisplay');
+    if (netDisplay) netDisplay.innerText = formatNumber(netTotal);
+    
+    const curBalEl = document.getElementById('currentBalance');
+    if (curBalEl) {
+        curBalEl.value = netTotal;
+    }
+
+    // [Sync Logic] Update AppState.ledgers if we are in the report view
+    const branchKey = document.getElementById('branchSelect2')?.value;
+    const reportDate = document.getElementById('reportDate')?.value;
+    if (branchKey && reportDate) {
+        const ledgerKey = `${branchKey}_${reportDate}`;
+        if (AppState.ledgers[ledgerKey]) {
+            AppState.ledgers[ledgerKey].previousBalance = prevBalance;
+        } else {
+             // Create ledger if it doesn't exist to maintain sync
+             AppState.ledgers[ledgerKey] = {
+                previousBalance: prevBalance,
+                rows: [{ bookingType: 'رصيد مرحل من التقرير', value: 0, receiptNo: '', clientName: '', expense: 0, type: '', notes: '' }]
+            };
+        }
+    }
+};
+
+
+// Auto-fetch the last report's closing balance for this branch
+window.fetchLastBalance = function(branchKey) {
+    const todayDate = today();
+    
+    // 1. Check past ledgers first (as it's the daily record)
+    const ledgerDates = Object.keys(AppState.ledgers)
+        .filter(k => k.startsWith(branchKey + '_'))
+        .map(k => k.split('_')[1])
+        .filter(d => d < todayDate)
+        .sort((a,b) => b.localeCompare(a));
+
+    if (ledgerDates.length > 0) {
+        const lastDate = ledgerDates[0];
+        const lastBalance = calculateLedgerEndBalance(`${branchKey}_${lastDate}`);
+        if (lastBalance > 0) {
+            const prevInput = document.getElementById('previousBalance');
+            if (prevInput && !prevInput.value) {
+                prevInput.value = lastBalance;
+                calculateGlobalBalance();
+                showToast(`تم سحب رصيد ${formatNumber(lastBalance)} ج.م من يومية ${lastDate} بنجاح`, 'success');
+                return;
+            }
+        }
+    }
+
+    // 2. Fallback: Check past reports
+    const pastReports = AppState.reports
+        .filter(r => r.branch === branchKey && r.date !== todayDate)
+        .sort((a, b) => b.date.localeCompare(a.date));
+    
+    if (pastReports.length > 0) {
+        const lastReport = pastReports[0];
+        const lastBalance = lastReport.currentBalance || lastReport.financials?.totalNet || 0;
+        
+        if (lastBalance > 0) {
+            const prevInput = document.getElementById('previousBalance');
+            if (prevInput && !prevInput.value) {
+                prevInput.value = lastBalance;
+                calculateGlobalBalance();
+                showToast(`تم سحب رصيد ${formatNumber(lastBalance)} ج.م من تقرير ${lastReport.date} تلقائياً`, 'success');
+            }
+        }
+    }
+};
+
+// Reload report when date or branch is changed manually and "Refresh" is clicked
+window.reloadReportByDate = function(resetToToday = false) {
+    const dateInput = document.getElementById('reportDate');
+    const branchInput = document.getElementById('branchSelect2');
+    
+    if (resetToToday) {
+        dateInput.value = today();
+    }
+    
+    const selectedDate = dateInput.value;
+    const selectedBranch = branchInput.value;
+    
+    // Find if a report exists for this combo
+    const existing = AppState.reports.find(r => r.branch === selectedBranch && r.date === selectedDate);
+    
+    const container = document.getElementById('pageContent');
+    if (container) {
+        renderReport(container, existing || { branch: selectedBranch, date: selectedDate });
+        showToast(existing ? `تم تحميل بيانات تقرير ${selectedDate}` : `البدء في تقرير جديد لتاريخ ${selectedDate}`, 'info');
+    }
 };
 
 window.saveReport = function() {
-    // Collect expense rows
-    const expenseRows = [...document.querySelectorAll('#expenseRows .expense-row')].map(row => {
-        const inputs = row.querySelectorAll('input');
-        return { beneficiary: inputs[0].value, type: inputs[1].value, amount: parseFloat(inputs[2].value) || 0 };
-    }).filter(e => e.beneficiary || e.amount);
+    const morningSecretaryRows = [...document.querySelectorAll('#morningSecretaryChecklist .presence-card.active')].map(item => {
+        const name = item.querySelector('input[type="checkbox"]').getAttribute('data-name');
+        const times = item.querySelectorAll('input[type="time"]');
+        return { name, start: times[0].value, end: times[1].value };
+    });
 
-    // Collect secretary rows
-    const secretaryRows = [...document.querySelectorAll('#eveningSecretaries .expense-row')].map(row => {
-        const sel = row.querySelector('select');
-        const inputs = row.querySelectorAll('input');
-        return { name: sel.value, start: inputs[0].value, end: inputs[1].value };
-    }).filter(s => s.name);
+    const eveningSecretaryRows = [...document.querySelectorAll('#eveningSecretaryChecklist .presence-card.active')].map(item => {
+        const name = item.querySelector('input[type="checkbox"]').getAttribute('data-name');
+        const times = item.querySelectorAll('input[type="time"]');
+        return { name, start: times[0].value, end: times[1].value };
+    });
 
-    const report = {
-        id: 'R' + Date.now(),
-        branch: document.getElementById('branchSelect2').value,
-        date: document.getElementById('reportDate').value,
-        morning: {
-            secretary: document.getElementById('morningSecretary').value,
-            openTime: document.getElementById('morningOpenTime').value,
-            closeTime: document.getElementById('morningCloseTime').value,
-            calls: parseInt(document.getElementById('morningCalls').value) || 0,
-            bookings: parseInt(document.getElementById('morningBookings').value) || 0,
-            revenue: parseFloat(document.getElementById('morningRevenue').value) || 0,
-        },
-        evening: {
-            secretaries: secretaryRows,
-            calls: parseInt(document.getElementById('eveningCalls').value) || 0,
-            bookings: parseInt(document.getElementById('eveningBookings').value) || 0,
-            bookingNote: document.getElementById('eveningBookingNote').value,
-            revenue: parseFloat(document.getElementById('eveningRevenue').value) || 0,
-        },
-        expenses: expenseRows,
-        teacherBookings: document.getElementById('teacherBookings').value,
-        cancellations: document.getElementById('cancellations').value,
-        currentBalance: parseFloat(document.getElementById('currentBalance').value) || 0,
+    const collectList = (containerId, type) => {
+        return [...document.querySelectorAll(`#${containerId} .transaction-row`)].map(row => {
+            const stmt = row.querySelector('input[placeholder*="بيان"]')?.value || '';
+            const amtInput = row.querySelector('input[placeholder="المبلغ"]');
+            const amount = parseFloat(amtInput?.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0;
+            return { statement: stmt, amount };
+        }).filter(i => i.statement || i.amount);
     };
 
-    AppState.reports.push(report);
+    const morningInflowList = collectList('morningInflowRows');
+    const morningOutflowList = collectList('morningOutflowRows');
+    const eveningInflowList = collectList('eveningInflowRows');
+    const eveningOutflowList = collectList('eveningOutflowRows');
+
+    // Combined for global totals (backward compatible)
+    const inflowList = [...morningInflowList, ...eveningInflowList];
+    const outflowList = [...morningOutflowList, ...eveningOutflowList];
+
+
+    const branchKey = document.getElementById('branchSelect2').value;
+    const reportDate = document.getElementById('reportDate').value;
+    const reportedBy = document.getElementById('reportedBy')?.value || '';
+    const existingIndex = AppState.reports.findIndex(r => r.branch === branchKey && r.date === reportDate);
+
+
+    const report = {
+        id: existingIndex >= 0 ? AppState.reports[existingIndex].id : 'R' + Date.now(),
+        branch: branchKey,
+        date: reportDate,
+        morning: {
+            secretaries: morningSecretaryRows,
+            openTime: document.getElementById('morningOpenTime').value,
+            closeTime: document.getElementById('morningCloseTime').value,
+            bookingNote: document.getElementById('morningBookingNote').value || '',
+            calls: parseInt(document.getElementById('morningCalls').value) || 0,
+            bookings: parseInt(document.getElementById('morningBookings').value) || 0
+        },
+        evening: {
+            secretaries: eveningSecretaryRows,
+            openTime: document.getElementById('eveningOpenTime').value,
+            closeTime: document.getElementById('eveningCloseTime').value,
+            bookingNote: document.getElementById('eveningBookingNote').value || '',
+            calls: parseInt(document.getElementById('eveningCalls').value) || 0,
+            bookings: parseInt(document.getElementById('eveningBookings').value) || 0,
+            reportedBy: reportedBy
+        },
+        financials: {
+            previousBalance: parseFloat(document.getElementById('previousBalance').value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0,
+            dailyInflow: parseFloat(document.getElementById('dailyInflow').value) || 0,
+            dailyOutflow: parseFloat(document.getElementById('dailyOutflow').value) || 0,
+            totalNet: parseFloat(document.getElementById('totalDailyNet').value) || 0,
+            inflowList: inflowList,
+            outflowList: outflowList,
+            morningInflowList: morningInflowList,
+            morningOutflowList: morningOutflowList,
+            eveningInflowList: eveningInflowList,
+            eveningOutflowList: eveningOutflowList
+        },
+        expenses: [],
+        teacherBookings: document.getElementById('teacherBookings').value,
+        cancellations: document.getElementById('cancellations').value,
+        currentBalance: parseFloat(document.getElementById('currentBalance').value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0,
+    };
+
+    if (existingIndex >= 0) {
+        AppState.reports[existingIndex] = report;
+    } else {
+        AppState.reports.push(report);
+    }
+    
     saveData();
     showToast('تم حفظ التقرير بنجاح!', 'success');
     setTimeout(() => navigate('dashboard'), 1000);
 };
+
 
 // -------------------------
 // Page: Branches
@@ -1340,9 +1831,11 @@ function renderBranches(el) {
     </div>
     <div class="branches-grid">
         ${Object.entries(BRANCHES).map(([key, branch], i) => {
-            const bReports = AppState.reports.filter(r => r.branch === key);
-            const bRev = bReports.reduce((s,r) => s + r.morning.revenue + r.evening.revenue, 0);
-            const bExp = bReports.reduce((s,r) => s + r.expenses.reduce((x,e)=>x+Number(e.amount||0),0), 0);
+            const bReports = AppState.reports.filter(r => r?.branch === key);
+            const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
+            const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
+            const bRev = bReports.reduce((s, r) => s + getInc(r), 0);
+            const bExp = bReports.reduce((s, r) => s + getExp(r), 0);
             return `
             <div class="branch-card animate-in" style="animation-delay:${i*0.08}s">
                 <div class="branch-card-top" style="background: linear-gradient(135deg, ${branch.color} 0%, ${branch.color}cc 100%);">
@@ -1549,6 +2042,154 @@ function renderFinance(el) {
         setTimeout(() => animateCount(el, target), 200);
     });
 }
+
+// -------------------------
+// Page: Daily Budget
+// -------------------------
+function renderDailyBudget(el) {
+    const isBranch = AppState.userRole === 'branch';
+    let budgets = AppState.budgets || [];
+    
+    if (isBranch) {
+        budgets = budgets.filter(b => b.branch === AppState.userBranch);
+    } else if (AppState.currentBranch && AppState.currentBranch !== 'all') {
+        budgets = budgets.filter(b => b.branch === AppState.currentBranch);
+    }
+
+    el.innerHTML = `
+    <div class="page-header animate-in">
+        <h1>📊 الميزانية اليومية للطلاب</h1>
+        <p>متابعة مدفوعات الطلاب، الأقساط، والمتبقي</p>
+    </div>
+
+    <div class="section-card animate-in">
+        <div class="section-card-header">
+            <div class="header-icon morning">➕</div>
+            <h3>إضافة ميزانية طالب جديد</h3>
+        </div>
+        <div class="section-card-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>اسم الطالب</label>
+                    <input type="text" id="budgetStudentName" placeholder="الاسم رباعي">
+                </div>
+                <div class="form-group">
+                    <label>الكورس / المادة</label>
+                    <input type="text" id="budgetCourse" placeholder="مثال: فيزياء 3 ث">
+                </div>
+                <div class="form-group">
+                    <label>إجمالي المبلغ</label>
+                    <input type="number" id="budgetTotal" placeholder="المبلغ الكلي">
+                </div>
+                <div class="form-group">
+                    <label>المدفوع</label>
+                    <input type="number" id="budgetPaid" placeholder="المبلغ المدفوع">
+                </div>
+                ${!isBranch ? `
+                <div class="form-group">
+                    <label>الفرع</label>
+                    <select id="budgetBranch">
+                        ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('')}
+                    </select>
+                </div>` : ''}
+            </div>
+            <button class="btn btn-primary" style="margin-top:15px;" onclick="addStudentBudget()">💾 حفظ البيانات</button>
+        </div>
+    </div>
+
+    <div class="section-card animate-in">
+        <div class="section-card-header">
+            <div class="header-icon finance">📋</div>
+            <h3>سجل الميزانيات</h3>
+        </div>
+        <div class="section-card-body table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>الطالب</th>
+                        <th>الكورس</th>
+                        <th>الفرع</th>
+                        <th>الإجمالي</th>
+                        <th>المدفوع</th>
+                        <th>المتبقي</th>
+                        <th>إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${budgets.length === 0 ? `<tr><td colspan="8"><div class="empty-state"><p>لا توجد ميزانيات مسجلة</p></div></td></tr>` : 
+                    budgets.map(b => `
+                    <tr>
+                        <td>${b.date}</td>
+                        <td><strong>${b.studentName}</strong></td>
+                        <td>${b.course}</td>
+                        <td>${BRANCHES[b.branch]?.name || b.branch}</td>
+                        <td style="color:var(--primary);font-weight:bold;">${b.total} ج.م</td>
+                        <td style="color:#27ae60;">${b.paid} ج.م</td>
+                        <td style="color:#e74c3c;font-weight:bold;">${b.total - b.paid} ج.م</td>
+                        <td>
+                            <button class="btn btn-outline" style="padding:4px 8px;font-size:12px;" onclick="addPaymentPrompt('${b.id}')">➕ دفعة</button>
+                            <button class="btn-remove" onclick="deleteBudget('${b.id}')">🗑️</button>
+                        </td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    `;
+}
+
+window.addStudentBudget = function() {
+    const studentName = document.getElementById('budgetStudentName').value.trim();
+    const course = document.getElementById('budgetCourse').value.trim();
+    const total = parseFloat(document.getElementById('budgetTotal').value) || 0;
+    const paid = parseFloat(document.getElementById('budgetPaid').value) || 0;
+    const branch = AppState.userRole === 'branch' ? AppState.userBranch : (document.getElementById('budgetBranch') ? document.getElementById('budgetBranch').value : Object.keys(BRANCHES)[0]);
+
+    if (!studentName || !course) {
+        return showToast('يرجى إدخال اسم الطالب والكورس', 'error');
+    }
+
+    if (!AppState.budgets) AppState.budgets = [];
+
+    AppState.budgets.push({
+        id: 'B' + Date.now(),
+        date: today(),
+        studentName,
+        course,
+        total,
+        paid,
+        branch
+    });
+
+    saveData();
+    showToast('تمت إضافة ميزانية الطالب بنجاح', 'success');
+    navigate('dailybudget');
+};
+
+window.addPaymentPrompt = function(id) {
+    const budget = AppState.budgets.find(b => b.id === id);
+    if (!budget) return;
+    
+    window.customPrompt(`إضافة دفعة للطالب ${budget.studentName} (المتبقي: ${budget.total - budget.paid})`, '0', (val) => {
+        const payment = parseFloat(val);
+        if (payment && payment > 0) {
+            budget.paid += payment;
+            saveData();
+            showToast('تم تحديث المدفوع بنجاح', 'success');
+            navigate('dailybudget');
+        }
+    });
+};
+
+window.deleteBudget = function(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه الميزانية؟')) return;
+    AppState.budgets = AppState.budgets.filter(b => b.id !== id);
+    saveData();
+    showToast('تم الحذف', 'error');
+    navigate('dailybudget');
+};
 
 // -------------------------
 // Page: Admin Editor
@@ -2008,6 +2649,336 @@ window.adminResetAll = function() {
 };
 
 // -------------------------
+// Page: Daily Budget Ledger
+// -------------------------
+window.renderDailyBudget = function(el) {
+    const isBranch = AppState.userRole === 'branch';
+    const activeBranch = isBranch ? AppState.userBranch : (AppState.currentBranch !== 'all' ? AppState.currentBranch : Object.keys(BRANCHES)[0]);
+    const activeDate = AppState.activeLedgerDate || today();
+    const ledgerKey = `${activeBranch}_${activeDate}`;
+    
+    // Ensure ledger object exists
+    if (!AppState.ledgers[ledgerKey]) {
+        AppState.ledgers[ledgerKey] = {
+            previousBalance: 0,
+            rows: [{ bookingType: '', value: 0, receiptNo: '', clientName: '', expense: 0, type: '', notes: '' }]
+        }
+    }
+    
+    // [Continuity Logic] Auto-fetch last balance if current is 0
+    if (AppState.ledgers[ledgerKey].previousBalance === 0) {
+        fetchLastLedgerBalance(activeBranch, activeDate);
+    }
+    
+    const ledger = AppState.ledgers[ledgerKey];
+    const dayName = arabicDate(activeDate).split('،')[0];
+
+    el.innerHTML = `
+    <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+        <div>
+            <h1 style="color:var(--primary); font-weight:900;">📊 اليومية والميزانية</h1>
+            <p style="opacity:0.7;">إدارة الحركات المالية لفرع ${BRANCHES[activeBranch]?.name || activeBranch}</p>
+        </div>
+        <div style="display:flex; gap:15px; align-items:center; background:var(--bg-card); padding:8px 15px; border-radius:100px; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
+            <!-- TODAY BUTTON -->
+            <button class="official-btn" style="width:auto; padding:8px 20px; margin:0; border-radius:100px; background:var(--primary); color:#fff; border:none; font-weight:bold;" onclick="resetLedgerToToday()">📅 اليوم</button>
+            
+            <!-- DATE SELECTOR -->
+            <input type="date" id="ledgerDateSelector" class="form-input" value="${activeDate}" onchange="changeLedgerDate(this.value)" style="border:none; background:transparent; font-weight:900; color:var(--text-primary); outline:none; width:130px;">
+            
+            <!-- PREVIOUS BALANCE CAPSULE -->
+            <div class="capsule-input" style="background:#f1c40f22 !important; border-color:#f1c40f !important; padding:5px 15px !important; min-width:160px;">
+                <label style="font-size:11px; color:#d35400; font-weight:bold; margin-left:8px;">الإيراد السابق:</label>
+                <input type="number" value="${ledger.previousBalance||0}" onchange="updateLedgerPreviousBalance('${ledgerKey}', this.value)" style="color:#d35400 !important; font-size:16px !important; width:90px;">
+            </div>
+
+            ${!isBranch ? `
+            <select class="form-input" onchange="changeLedgerBranch(this.value)" style="border:none; background:transparent; font-weight:900; border-right:1px solid var(--border-color); padding-right:15px; color:var(--text-primary); outline:none;">
+                ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}" ${k===activeBranch?'selected':''}>${v.name}</option>`).join('')}
+            </select>` : ''}
+        </div>
+    </div>
+
+        <!-- MODERN LEDGER TABLE HEADER -->
+        <div class="official-table-grid" style="grid-template-columns: 45px 2.2fr 95px 95px 1.5fr 95px 1fr 1.2fr; background: linear-gradient(135deg, #34495e, #2c3e50); color:#fff; font-weight:950; font-size:13px; text-align:center; border-radius:100px; margin-bottom:15px; padding:12px; box-shadow:0 8px 15px rgba(0,0,0,0.1);">
+            <div>م</div>
+            <div>نوع الحجز والبيان</div>
+            <div>الوارد (+)</div>
+            <div>رقم الإيصال</div>
+            <div>اسم العميل</div>
+            <div>المنصرف (-)</div>
+            <div>نوع المنصرف</div>
+            <div>ملاحظات</div>
+        </div>
+
+        <div id="ledgerRowsContainer" style="display:flex; flex-direction:column; gap:5px;">
+            ${ledger.rows.map((row, idx) => `
+            <div class="ledger-row-premium animate-in">
+                <!-- Index Capsule -->
+                <div class="capsule-input capsule-idx">${idx + 1}</div>
+                
+                <!-- Statement Capsule (Large) -->
+                <div class="capsule-input capsule-large">
+                    <input type="text" placeholder="نوع الحجز والبيان..." value="${row.bookingType||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'bookingType', this.value)">
+                </div>
+
+                <!-- Inflow Capsule (Small/Green) -->
+                <div class="capsule-input capsule-small inflow-accent">
+                    <input type="number" placeholder="الوارد" value="${row.value||0}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'value', this.value)">
+                </div>
+
+                <!-- Receipt Capsule (Small) -->
+                <div class="capsule-input capsule-small">
+                    <input type="text" placeholder="إيصال" value="${row.receiptNo||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'receiptNo', this.value)">
+                </div>
+
+                <!-- Client Capsule (Wide) -->
+                <div class="capsule-input capsule-wide">
+                    <input type="text" placeholder="اسم العميل" value="${row.clientName||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'clientName', this.value)">
+                </div>
+
+                <!-- Outflow Capsule (Small/Red) -->
+                <div class="capsule-input capsule-small outflow-accent">
+                    <input type="number" placeholder="المنصرف" value="${row.expense||0}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'expense', this.value)">
+                </div>
+
+                <!-- Exp Type Capsule (Medium) -->
+                <div class="capsule-input capsule-medium">
+                    <input type="text" placeholder="نوع المنصرف" value="${row.type||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'type', this.value)">
+                </div>
+
+                <!-- Notes Capsule (Medium) -->
+                <div class="capsule-input capsule-medium">
+                    <input type="text" placeholder="ملاحظات" value="${row.notes || row.signature || ''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'notes', this.value)">
+                </div>
+            </div>
+            `).join('')}
+        </div>
+
+        <!-- FOOTER NEON CARDS -->
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px; margin-top:30px;">
+            <div class="neon-summary-card" style="background:rgba(39,174,96,0.1); border:1px solid rgba(39,174,96,0.3); border-radius:20px; padding:20px; text-align:center; box-shadow: 0 0 15px rgba(39,174,96,0.1);">
+                <div style="color:#2ecc71; font-size:13px; font-weight:700; margin-bottom:10px;">🟢 إجمالي الوارد اليوم</div>
+                <div id="ledgerTotalInflow" style="font-size:28px; font-weight:950; color:#2ecc71;">${formatNumber(calculateLedgerInflow(ledgerKey))}</div>
+            </div>
+            <div class="neon-summary-card" style="background:rgba(231,76,60,0.1); border:1px solid rgba(231,76,60,0.3); border-radius:20px; padding:20px; text-align:center; box-shadow: 0 0 15px rgba(231,76,60,0.1);">
+                <div style="color:#e74c3c; font-size:13px; font-weight:700; margin-bottom:10px;">🔴 إجمالي المنصرف اليوم</div>
+                <div id="ledgerTotalOutflow" style="font-size:28px; font-weight:950; color:#e74c3c;">${formatNumber(calculateLedgerOutflow(ledgerKey))}</div>
+            </div>
+            <div class="neon-summary-card" style="background:var(--gradient-primary); border-radius:20px; padding:20px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                <div style="color:rgba(255,255,255,0.8); font-size:13px; font-weight:700; margin-bottom:10px;">📊 الرصيد النهائي لليوم</div>
+                <div id="ledgerEndBalance" style="font-size:32px; font-weight:950; color:#fff; text-shadow: 0 0 15px rgba(255,255,255,0.3);">${formatNumber(calculateLedgerEndBalance(ledgerKey))}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTIONS BUTTONS -->
+    <div style="padding:30px; display:flex; justify-content:center; gap:25px; flex-wrap:wrap;">
+        <button class="official-btn" style="padding:15px 40px; border-radius:100px; background:var(--gradient-primary); color:#fff; border:none; font-size:16px; font-weight:900; box-shadow:0 10px 30px rgba(0,0,0,0.15);" onclick="saveLedger('${ledgerKey}')">💾 حفظ الحركات</button>
+        <button class="official-btn" style="padding:15px 40px; border-radius:100px; background:linear-gradient(135deg, #34495e, #2c3e50); color:#fff; border:none; font-size:16px; font-weight:900; box-shadow:0 10px 30px rgba(0,0,0,0.15);" onclick="exportLedgerPDF('${ledgerKey}')">🖨️ تصدير كـ PDF</button>
+        <button class="official-btn" style="padding:15px 40px; border-radius:100px; background:rgba(0,0,0,0.05); color:var(--text-secondary); border:1px dashed var(--border-color); font-size:16px; font-weight:900;" onclick="addLedgerRow('${ledgerKey}')">+ إضافة سطر جديد</button>
+    </div>
+    `;
+};
+
+window.resetLedgerToToday = function() {
+    AppState.activeLedgerDate = today();
+    renderDailyBudget(document.getElementById('pageContent'));
+};
+
+window.exportLedgerPDF = async function(key) {
+    const element = document.getElementById('ledgerCaptureArea');
+    if (!element) return;
+
+    const parts = key.split('_');
+    const bKey = parts[0];
+    const date = parts[1];
+    const branchName = BRANCHES[bKey]?.name || 'فرع';
+
+    // IMPORTANT: Sync UI values to DOM attributes for html2canvas
+    const inputs = element.querySelectorAll('input, select');
+    inputs.forEach(input => {
+        if (input.type === 'checkbox' || input.type === 'radio') {
+            if (input.checked) input.setAttribute('checked', '');
+            else input.removeAttribute('checked');
+        } else {
+            input.setAttribute('value', input.value);
+            input.style.color = '#000'; // Force solid black text for PDF
+            input.style.fontWeight = '900';
+            if (input.style.background === 'transparent' || input.style.background === '') {
+                input.style.background = '#fff';
+            }
+        }
+    });
+
+    // Force solid backgrounds for gradients to prevent html2canvas fading
+    const gradientEls = element.querySelectorAll('[style*="linear-gradient"]');
+    const oldGradients = [];
+    gradientEls.forEach(el => {
+        oldGradients.push({ el, bg: el.style.background });
+        if (el.style.background.includes('#11998e')) el.style.background = '#11998e'; // Solid green
+        else if (el.style.background.includes('#cb2d3e')) el.style.background = '#cb2d3e'; // Solid red
+        else if (el.style.background.includes('#1e3c72')) el.style.background = '#1e3c72'; // Solid blue
+        else if (el.style.background.includes('#232526')) el.style.background = '#232526'; // Solid dark
+        else el.style.background = '#555';
+    });
+
+    const opt = {
+        margin: 5,
+        filename: `يومية_${branchName}_${date}.pdf`,
+        image: { type: 'jpeg', quality: 1.0 },
+        html2canvas: { 
+            scale: 2, 
+            useCORS: true,
+            logging: false,
+            letterRendering: true,
+            allowTaint: true
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    showToast('⏳ جاري استخراج التقرير بصيغة PDF...', 'info');
+    
+    // Tiny delay to ensure styles and sync are applied
+    setTimeout(async () => {
+        try {
+            await html2pdf().set(opt).from(element).save();
+            showToast('✅ تم تحميل تقرير PDF بنجاح!', 'success');
+        } catch (err) {
+            showToast('❌ فشل تصدير PDF', 'error');
+            console.error(err);
+        } finally {
+            // Cleanup
+            inputs.forEach(input => {
+                input.removeAttribute('value');
+                input.removeAttribute('checked');
+                input.style.color = '';
+                input.style.fontWeight = '';
+                input.style.background = 'transparent';
+            });
+            oldGradients.forEach(item => {
+                item.el.style.background = item.bg;
+            });
+        }
+    }, 500);
+};
+
+window.changeLedgerDate = function(val) {
+    AppState.activeLedgerDate = val;
+    renderDailyBudget(document.getElementById('pageContent'));
+};
+
+window.changeLedgerBranch = function(val) {
+    AppState.currentBranch = val;
+    renderDailyBudget(document.getElementById('pageContent'));
+};
+
+window.updateLedgerMeta = function(key, field, val) {
+    AppState.ledgers[key][field] = parseFloat(val) || 0;
+    saveData();
+    renderDailyBudget(document.getElementById('pageContent'));
+};
+
+window.updateLedgerPreviousBalance = function(key, val) {
+    if (!AppState.ledgers[key]) return;
+    const numericVal = parseFloat(val) || 0;
+    AppState.ledgers[key].previousBalance = numericVal;
+    
+    // [Sync Logic] Update Report financials if report exists for the same branch and date
+    const parts = key.split('_');
+    const bKey = parts[0];
+    const dStr = parts[1];
+    const report = AppState.reports.find(r => r.branch === bKey && r.date === dStr);
+    if (report) {
+        if (!report.financials) report.financials = {};
+        report.financials.previousBalance = numericVal;
+        // Recalculate report balance
+        const inTotal = report.financials.dailyInflow || 0;
+        const outTotal = report.financials.dailyOutflow || 0;
+        report.financials.totalNet = numericVal + inTotal - outTotal;
+        report.currentBalance = report.financials.totalNet;
+    }
+
+    saveData();
+    renderDailyBudget(document.getElementById('pageContent'));
+};
+
+window.fetchLastLedgerBalance = function(branchKey, activeDate) {
+    // Find previous ledger entry
+    const dates = Object.keys(AppState.ledgers)
+        .filter(k => k.startsWith(branchKey + '_'))
+        .map(k => k.split('_')[1])
+        .filter(d => d < activeDate)
+        .sort((a,b) => b.localeCompare(a));
+
+    if (dates.length > 0) {
+        const lastDate = dates[0];
+        const lastKey = `${branchKey}_${lastDate}`;
+        const lastBalance = calculateLedgerEndBalance(lastKey);
+        
+        if (lastBalance > 0) {
+            AppState.ledgers[`${branchKey}_${activeDate}`].previousBalance = lastBalance;
+            showToast(`تم ترحيل رصيد ${formatNumber(lastBalance)} من يوم ${lastDate} بنجاح`, 'success');
+        }
+    } else {
+        // Fallback: Try to fetch from reports if no ledger exists
+        const pastReports = AppState.reports
+            .filter(r => r.branch === branchKey && r.date < activeDate)
+            .sort((a, b) => b.date.localeCompare(a.date));
+        
+        if (pastReports.length > 0) {
+            const lastReport = pastReports[0];
+            const lastBalance = lastReport.currentBalance || lastReport.financials?.totalNet || 0;
+            if (lastBalance > 0) {
+                AppState.ledgers[`${branchKey}_${activeDate}`].previousBalance = lastBalance;
+                showToast(`تم سحب رصيد ${formatNumber(lastBalance)} من تقرير ${lastReport.date} تلقائياً`, 'success');
+            }
+        }
+    }
+};
+
+window.updateLedgerRow = function(key, idx, field, val) {
+    if (field === 'value' || field === 'expense') val = parseFloat(val) || 0;
+    AppState.ledgers[key].rows[idx][field] = val;
+    saveData();
+    // Instant update
+    document.getElementById('ledgerTotalInflow').textContent = formatNumber(calculateLedgerInflow(key));
+    document.getElementById('ledgerTotalOutflow').textContent = formatNumber(calculateLedgerOutflow(key));
+    document.getElementById('ledgerEndBalance').textContent = formatNumber(calculateLedgerEndBalance(key));
+};
+
+window.addLedgerRow = function(key) {
+    AppState.ledgers[key].rows.push({ bookingType: '', value: 0, receiptNo: '', clientName: '', expense: 0, type: '', notes: '' });
+    saveData();
+    renderDailyBudget(document.getElementById('pageContent'));
+};
+
+window.saveLedger = function(key) {
+    saveData();
+    showToast('تم حفظ اليومية بنجاح 💾', 'success');
+};
+
+window.calculateLedgerInflow = function(key) {
+    const l = AppState.ledgers[key];
+    if (!l) return 0;
+    return l.rows.reduce((s, r) => s + (parseFloat(r.value) || 0), 0);
+};
+
+window.calculateLedgerOutflow = function(key) {
+    const l = AppState.ledgers[key];
+    if (!l) return 0;
+    return l.rows.reduce((s, r) => s + (parseFloat(r.expense) || 0), 0);
+};
+
+window.calculateLedgerEndBalance = function(key) {
+    const l = AppState.ledgers[key];
+    if (!l) return 0;
+    const inflow = calculateLedgerInflow(key);
+    const outflow = calculateLedgerOutflow(key);
+    return (parseFloat(l.previousBalance) || 0) + inflow - outflow;
+};
+
+// -------------------------
 // Theme Toggle
 // -------------------------
 function applyTheme(theme) {
@@ -2038,6 +3009,16 @@ function startClock() {
 // App Init
 // -------------------------
 document.addEventListener('DOMContentLoaded', () => {
+    // Ensure fresh operational start BEFORE any other logic
+    if (!localStorage.getItem('bms_fresh_start_v3')) {
+        console.log("🧹 Clearing legacy test data...");
+        AppState.reports = [];
+        BRANCHES = {...DEFAULT_BRANCHES};
+        EMPLOYEES = [...DEFAULT_EMPLOYEES];
+        saveData();
+        localStorage.setItem('bms_fresh_start_v3', 'true');
+    }
+
     // Toast container
     const toast = document.createElement('div');
     toast.id = 'toastContainer';
@@ -2140,15 +3121,5 @@ document.addEventListener('DOMContentLoaded', () => {
         syncWithCloud();
     } else {
         checkSeeding();
-    }
-
-    // Ensure fresh operational start by clearing legacy test data
-    if (!localStorage.getItem('bms_fresh_start_v3')) {
-        console.log("🧹 Clearing legacy test data...");
-        AppState.reports = [];
-        EMPLOYEES = [...DEFAULT_EMPLOYEES];
-        BRANCHES = {...DEFAULT_BRANCHES};
-        saveData();
-        localStorage.setItem('bms_fresh_start_v3', 'true');
     }
 });
