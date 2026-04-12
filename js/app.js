@@ -99,9 +99,10 @@ window.syncWithCloud = function() {
         if (!AppState.userRole) return;
         if (snap.exists()) {
             const raw = snap.val();
-            AppState.reports = Array.isArray(raw) ? raw : Object.values(raw);
+            const reportsArray = Array.isArray(raw) ? raw : Object.values(raw);
+            AppState.reports = deduplicateReports(reportsArray);
             localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
-            console.log("✅ Reports synced");
+            console.log("✅ Reports synced & deduplicated");
             if (AppState.currentPage === 'dashboard') navigate('dashboard');
         }
     });
@@ -223,6 +224,52 @@ function checkSeeding() {
 // -------------------------
 function formatNumber(n) {
     return Number(n || 0).toLocaleString('en-US'); // Force English numerals
+}
+
+function deduplicateReports(reports) {
+    if (!Array.isArray(reports)) return [];
+    const map = new Map();
+    reports.forEach(r => {
+        if (!r || !r.branch || !r.date) return;
+        const key = `${r.branch}_${r.date}`;
+        
+        if (map.has(key)) {
+            const existing = map.get(key);
+            // Intelligent Merge Logic
+            const merged = { ...existing, ...r }; // Start with latest r as base
+            
+            // Merge Secretaries (Unique by name)
+            const mSecs = [...(existing.morning?.secretaries || []), ...(r.morning?.secretaries || [])];
+            const eSecs = [...(existing.evening?.secretaries || []), ...(r.evening?.secretaries || [])];
+            merged.morning.secretaries = Array.from(new Map(mSecs.map(s => [s.name, s])).values());
+            merged.evening.secretaries = Array.from(new Map(eSecs.map(s => [s.name, s])).values());
+            
+            // Merge Financials (Inflow/Outflow Lists)
+            const mInflow = [...(existing.financials?.morningInflowList || []), ...(r.financials?.morningInflowList || [])];
+            const eInflow = [...(existing.financials?.eveningInflowList || []), ...(r.financials?.eveningInflowList || [])];
+            const mOutflow = [...(existing.financials?.morningOutflowList || []), ...(r.financials?.morningOutflowList || [])];
+            const eOutflow = [...(existing.financials?.eveningOutflowList || []), ...(r.financials?.eveningOutflowList || [])];
+            
+            merged.financials = {
+                ...merged.financials,
+                morningInflowList: Array.from(new Map(mInflow.map(i => [i.statement + i.amount, i])).values()),
+                eveningInflowList: Array.from(new Map(eInflow.map(i => [i.statement + i.amount, i])).values()),
+                morningOutflowList: Array.from(new Map(mOutflow.map(i => [i.statement + i.amount, i])).values()),
+                eveningOutflowList: Array.from(new Map(eOutflow.map(i => [i.statement + i.amount, i])).values())
+            };
+
+            // Recalculate totals
+            merged.financials.dailyInflow = merged.financials.morningInflowList.concat(merged.financials.eveningInflowList).reduce((s,i) => s + (i.amount||0), 0);
+            merged.financials.dailyOutflow = merged.financials.morningOutflowList.concat(merged.financials.eveningOutflowList).reduce((s,i) => s + (i.amount||0), 0);
+            merged.financials.totalNet = (merged.financials.previousBalance || 0) + merged.financials.dailyInflow - merged.financials.dailyOutflow;
+            merged.currentBalance = merged.financials.totalNet;
+
+            map.set(key, merged);
+        } else {
+            map.set(key, r);
+        }
+    });
+    return Array.from(map.values());
 }
 
 function today() {
@@ -647,7 +694,10 @@ window.forceSyncData = async function() {
             const data = snap.val();
             
             // Core Data Sync with Array Correction
-            if (data.reports) AppState.reports = Array.isArray(data.reports) ? data.reports : Object.values(data.reports);
+            if (data.reports) {
+                const reportsArray = Array.isArray(data.reports) ? data.reports : Object.values(data.reports);
+                AppState.reports = deduplicateReports(reportsArray);
+            }
             if (data.ledgers) AppState.ledgers = data.ledgers;
             if (data.budgets) AppState.budgets = Array.isArray(data.budgets) ? data.budgets : Object.values(data.budgets);
             if (data.branches) BRANCHES = data.branches;
@@ -658,6 +708,9 @@ window.forceSyncData = async function() {
             localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
             localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
             localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
+            
+            // Push cleaned/deduplicated data back to cloud if we are lead
+            if (AppState.isInitialSyncComplete) saveData();
             
             // Update Nitro Flag
             AppState.isInitialSyncComplete = true;
@@ -972,7 +1025,7 @@ function renderDashboard(el) {
             <div class="value">${formatNumber(totalExpenses)}</div>
         </div>
         <div class="official-summary-item">
-            <div class="label">صافي ايراد اليوم</div>
+            <div class="label">صافي حركة اليوم</div>
             <div class="value">${formatNumber(netRevenue)}</div>
         </div>
         <div class="official-summary-item highlight">
@@ -1002,7 +1055,7 @@ function renderDashboard(el) {
                     <span class="official-stat-value">${formatNumber(bd.tExp || 0)} ج.م</span>
                 </div>
                 <div class="official-stat-row">
-                    <span class="official-stat-label">صافي إيراد اليوم</span>
+                    <span class="official-stat-label">صافي حركة اليوم</span>
                     <span class="official-stat-value" style="color:var(--primary) !important;">${formatNumber(bd.tRev - bd.tExp)} ج.م</span>
                 </div>
                 <div class="official-stat-row">
@@ -1100,7 +1153,7 @@ function renderManagerDashboard(el) {
             <div class="value" style="color:#fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatNumber(totalManagerExp)}</div>
         </div>
         <div class="official-summary-item" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; border:none; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-            <div class="label" style="color:#fff; font-weight:800;">صافي ايراد اليوم</div>
+            <div class="label" style="color:#fff; font-weight:800;">صافي حركة اليوم</div>
             <div class="value" style="color:#fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatNumber(totalManagerNet)}</div>
         </div>
         <div class="official-summary-item highlight" style="background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: #fff; border:none; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
@@ -1318,18 +1371,18 @@ window.renderOfficialTable = function(report) {
 
         <!-- FINANCIAL SUMMARY -->
         <div class="official-table-grid" style="border:1px solid rgba(0,0,0,0.05);">
-            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border:none; color:#fff;">مجموع ايراد اليوم:</div>
+            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border:none; color:#fff;">مجموع إيراد اليوم:</div>
             <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%); border:none; border-right:1px solid rgba(0,0,0,0.05); color:#fff;">مجموع منصرف:</div>
-            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border:none; border-right:1px solid rgba(0,0,0,0.05); color:#fff;">صافي ايراد اليوم:</div>
+            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border:none; border-right:1px solid rgba(0,0,0,0.05); color:#fff;">صافي حركة اليوم:</div>
             
             <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#11998e; border:none; border-top:1px solid rgba(0,0,0,0.05);">${formatNumber(report.financials?.dailyInflow || 0)}</div>
             <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#cb2d3e; border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">${formatNumber(report.financials?.dailyOutflow || 0)}</div>
-            <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#1e3c72; border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">${formatNumber(report.financials?.totalNet || 0)}</div>
+            <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#1e3c72; border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">${formatNumber((report.financials?.dailyInflow || 0) - (report.financials?.dailyOutflow || 0))}</div>
         </div>
 
         <!-- BALANCE BAR -->
         <div class="official-header-red" style="margin-top:2px; font-size:22px; background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); border:none; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,0.2);">
-            الحالي : ${formatNumber(report.currentBalance || 0)}
+            الرصيد الفعلي (شامل السابق) : ${formatNumber(report.currentBalance || 0)}
         </div>
 
         <!-- EXPENSE TABLE -->
@@ -1410,7 +1463,7 @@ function renderReport(el, existingData = null) {
                 ${AppState.userRole === 'branch' 
                     ? `<div style="padding:12px; background:var(--bg-input); border-radius:12px; font-weight:bold; color:var(--primary); font-size:16px;">${BRANCHES[AppState.userBranch]?.name}</div>
                        <input type="hidden" id="branchSelect2" value="${AppState.userBranch}">`
-                    : `<select id="branchSelect2" style="padding:12px; border-radius:12px;">
+                    : `<select id="branchSelect2" onchange="reloadReportByDate()" style="padding:12px; border-radius:12px;">
                         ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}" ${k===(data.branch || AppState.userBranch || 'soyouf')?'selected':''}>${v.name}</option>`).join('')}
                        </select>`
                 }
@@ -1418,7 +1471,7 @@ function renderReport(el, existingData = null) {
             <div class="form-group">
                 <label>التاريخ</label>
                 <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="date" id="reportDate" value="${data.date || today()}" style="padding:12px; border-radius:12px; flex:1;">
+                    <input type="date" id="reportDate" onchange="reloadReportByDate()" value="${data.date || today()}" style="padding:12px; border-radius:12px; flex:1;">
                     <button class="official-btn" onclick="reloadReportByDate()" title="مزامنة بيانات التاريخ المحدد" style="padding:12px; width:45px; height:45px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:var(--primary); color:#fff; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
                         🔄
                     </button>
@@ -1663,18 +1716,6 @@ function renderReport(el, existingData = null) {
     } else if (!existingData || !financials.previousBalance) {
         fetchLastBalance(bKey);
     }
-
-    // Sync checklists and handle dynamic re-fetching for branch/date changes
-    const bSel = document.getElementById('branchSelect2');
-    if (bSel) {
-        bSel.addEventListener('change', (e) => {
-            const newBranch = e.target.value;
-            const targetDate = document.getElementById('reportDate').value;
-            // Check if we have a report for this new combination
-            const existing = AppState.reports.find(r => r.branch === newBranch && r.date === targetDate);
-            renderReport(el, existing); // Re-render with new data
-        });
-    }
 }
 
 window.updateSecretaryLists = function(branchKey, morningData = [], eveningData = []) {
@@ -1685,11 +1726,18 @@ window.updateSecretaryLists = function(branchKey, morningData = [], eveningData 
     const branchStaff = EMPLOYEES.filter(e => e.branch === branchKey);
     
     const renderList = (shift) => {
+        const shiftData = (shift === 'morning') ? morningData : eveningData;
         const defStart = (shift === 'morning') ? document.getElementById('morningOpenTime').value : document.getElementById('eveningOpenTime').value;
         const defEnd = (shift === 'morning') ? document.getElementById('morningCloseTime').value : document.getElementById('eveningCloseTime').value;
         
-        return branchStaff.map(emp => `
-            <div class="presence-card animate-in" onclick="togglePresence(this, '${shift}')">
+        return branchStaff.map(emp => {
+            const saved = shiftData.find(s => s.name === emp.name);
+            const isActive = !!saved;
+            const startTime = saved ? saved.start : defStart;
+            const endTime = saved ? saved.end : defEnd;
+
+            return `
+            <div class="presence-card animate-in ${isActive ? 'active' : ''}" onclick="togglePresence(this, '${shift}')">
                 <div class="check-icon">✓</div>
                 <div class="avatar-circle">${emp.name[0]}</div>
                 <div class="emp-name">${emp.name}</div>
@@ -1698,16 +1746,16 @@ window.updateSecretaryLists = function(branchKey, morningData = [], eveningData 
                 <div class="card-times" onclick="event.stopPropagation()">
                     <div class="time-input-group">
                         <label>الحضور</label>
-                        <input type="time" class="time-in" value="${defStart}">
+                        <input type="time" class="time-in" value="${startTime}">
                     </div>
                     <div class="time-input-group">
                         <label>الانصراف</label>
-                        <input type="time" class="time-out" value="${defEnd}">
+                        <input type="time" class="time-out" value="${endTime}">
                     </div>
                 </div>
-                <input type="checkbox" style="display:none;" data-name="${emp.name}">
-            </div>
-        `).join('') || '<p style="color:var(--text-secondary); padding:10px;">لا يوجد موظفين مسجلين هذا الفرع</p>';
+                <input type="checkbox" style="display:none;" data-name="${emp.name}" ${isActive ? 'checked' : ''}>
+            </div>`;
+        }).join('') || '<p style="color:var(--text-secondary); padding:10px;">لا يوجد موظفين مسجلين هذا الفرع</p>';
     };
 
     morningContainer.innerHTML = renderList('morning');
@@ -2003,6 +2051,9 @@ window.saveReport = function() {
     } else {
         AppState.reports.push(report);
     }
+    
+    // Safety check: ensure no duplicates were accidentally created
+    AppState.reports = deduplicateReports(AppState.reports);
     
     saveReportEntry(report);
     showToast('تم حفظ التقرير بنجاح!', 'success');
