@@ -281,6 +281,9 @@ function deduplicateReports(reports) {
             }
         }
 
+        // Apply normalized branch key back to the report object for consistency
+        r.branch = bKey;
+
         // 2. Normalize Date: Ensure YYYY-MM-DD
         const dKey = String(r.date).trim();
         const key = `${bKey}_${dKey}`;
@@ -1300,9 +1303,10 @@ window.searchManagerReport = function () {
     const branchKey = branchFilterTrigger ? branchFilterTrigger.dataset.value : 'all';
     const res = document.getElementById('mReportResult');
 
+    // 1. Filter reports strictly
     const reports = (branchKey === 'all')
         ? AppState.reports.filter(r => r.date === date)
-        : AppState.reports.filter(r => r?.branch === branchKey && r.date === date);
+        : AppState.reports.filter(r => (r?.branch === branchKey || normalizeArabic(r.branch) === branchKey) && r.date === date);
 
     if (reports.length === 0) {
         res.innerHTML = `
@@ -1313,39 +1317,38 @@ window.searchManagerReport = function () {
         return;
     }
 
-    if (branchKey === 'all') {
-        const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
-        const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
+    // 2. Calculate Totals (Unify logic)
+    const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
+    const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
 
-        const totalRev = reports.reduce((s, r) => s + getInc(r), 0);
-        const totalExp = reports.reduce((s, r) => s + getExp(r), 0);
-        const totalBucks = reports.reduce((s, r) => s + (r?.morning?.bookings || 0) + (r?.evening?.bookings || 0), 0);
+    const totalRev = reports.reduce((s, r) => s + getInc(r), 0);
+    const totalExp = reports.reduce((s, r) => s + getExp(r), 0);
+    const totalBucks = reports.reduce((s, r) => s + (r?.morning?.bookings || 0) + (r?.evening?.bookings || 0), 0);
 
-        res.innerHTML = `
-        <div class="summary-grid animate-in" style="margin-bottom:20px;">
-            <div class="summary-card red" style="padding:15px;">
-                <div class="card-label">إجمالي إيراد الفروع</div>
-                <div class="card-value" style="font-size:20px;">${formatNumber(totalRev)} <small>ج.م</small></div>
-            </div>
-            <div class="summary-card gold" style="padding:15px;">
-                <div class="card-label">إجمالي المصروفات</div>
-                <div class="card-value" style="font-size:20px;">${formatNumber(totalExp)} <small>ج.م</small></div>
-            </div>
-            <div class="summary-card green" style="padding:15px;">
-                <div class="card-label">صافي إجمالي اليوم</div>
-                <div class="card-value" style="font-size:20px;">${formatNumber(totalRev - totalExp)} <small>ج.م</small></div>
-            </div>
-            <div class="summary-card blue" style="padding:15px;">
-                <div class="card-label">إجمالي الحجوزات</div>
-                <div class="card-value" style="font-size:20px;">${totalBucks} <span style="font-size:12px;">حجز</span></div>
-            </div>
+    const branchLabel = (branchKey === 'all') ? 'إجمالي جميع الفروع' : `إجمالي ${BRANCHES[branchKey]?.name || 'الفرع'}`;
+
+    res.innerHTML = `
+    <div class="summary-grid animate-in" style="margin-bottom:20px;">
+        <div class="summary-card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: #fff; border:none; padding:15px;">
+            <div class="card-label" style="color:#fff; font-weight:800;">${branchLabel}</div>
+            <div class="card-value" style="font-size:22px; color:#fff;">${formatNumber(totalRev)} <small>ج.م</small></div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:40px; padding-bottom:50px;">
-            ${reports.map(report => renderOfficialTable(report)).join('')}
-        </div>`;
-    } else {
-        res.innerHTML = reports.map(report => renderOfficialTable(report)).join('');
-    }
+        <div class="summary-card" style="background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%); color: #fff; border:none; padding:15px;">
+            <div class="card-label" style="color:#fff; font-weight:800;">المصروفات</div>
+            <div class="card-value" style="font-size:22px; color:#fff;">${formatNumber(totalExp)} <small>ج.م</small></div>
+        </div>
+        <div class="summary-card" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; border:none; padding:15px;">
+            <div class="card-label" style="color:#fff; font-weight:800;">الصافي</div>
+            <div class="card-value" style="font-size:22px; color:#fff;">${formatNumber(totalRev - totalExp)} <small>ج.م</small></div>
+        </div>
+        <div class="summary-card" style="background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: #fff; border:none; padding:15px;">
+            <div class="card-label" style="color:#fff; font-weight:800;">الحجوزات</div>
+            <div class="card-value" style="font-size:22px; color:#fff;">${totalBucks} <span style="font-size:12px;">حجز</span></div>
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:40px; padding-bottom:50px;">
+        ${reports.map(report => renderOfficialTable(report)).join('')}
+    </div>`;
 };
 
 window.renderOfficialTable = function (report) {
@@ -3481,7 +3484,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const triggerText = document.getElementById(id + '-text');
         const options = document.getElementById(id + '-options');
 
-        if (trigger) trigger.style.background = color;
+        if (trigger) {
+            trigger.style.background = color;
+            trigger.dataset.value = val; // Crucial fix: update the actual value used for filtering
+        }
         if (triggerText) triggerText.innerText = name;
         if (options) options.classList.remove('show');
 
