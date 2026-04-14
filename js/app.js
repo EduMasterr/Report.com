@@ -16,6 +16,7 @@ const AppState = {
     userBranch: localStorage.getItem('bms_branch'),
     managerName: localStorage.getItem('bms_manager_name') || 'المدير العام',
     masterPassword: localStorage.getItem('bms_master_pass') || 'admin#135',
+    managerPassword: localStorage.getItem('bms_manager_pass') || 'admin_2026',
     backupPath: localStorage.getItem('bms_backup_path') || 'D:\\\\Backups-Report',
     ledgers: JSON.parse(localStorage.getItem('bms_ledgers') || '{}'),
     systemSecret: 'ReportV2_SecurePath_882', // Dynamic path for cloud data
@@ -24,14 +25,23 @@ const AppState = {
 
 // Default data (used for seeding if no localStorage)
 const DEFAULT_BRANCHES = {
-
-    miami: { name: 'فرع ميامي', city: 'الإسكندرية', color: '#1a5276' },
+    miami: { name: 'فرع ميامى', city: 'الإسكندرية', color: '#1a5276' },
     mandara: { name: 'فرع المندرة', city: 'الإسكندرية', color: '#512e5f' },
     soyouf: { name: 'فرع السيوف', city: 'الإسكندرية', color: '#8B0000' },
     smouha: { name: 'فرع سموحة', city: 'الإسكندرية', color: '#1d6a3e' },
-    agamy: { name: 'فرع العجمي', city: 'الإسكندرية', color: '#7d6608' },
-    branch6: { name: 'الفرع السادس', city: 'الإسكندرية', color: '#2c3e50' },
+    agamy: { name: 'فرع العجمى', city: 'الإسكندرية', color: '#7d6608' },
+    branch6: { name: 'فرع السادس', city: 'الإسكندرية', color: '#2c3e50' },
 };
+
+const BRANCH_ORDER = ['miami', 'mandara', 'soyouf', 'smouha', 'agamy', 'branch6'];
+function getSortedBranchesEntries(obj) {
+    const list = obj || BRANCHES;
+    return Object.entries(list).sort((a, b) => {
+        const idxA = BRANCH_ORDER.indexOf(a[0]);
+        const idxB = BRANCH_ORDER.indexOf(b[0]);
+        return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+    });
+}
 const DEFAULT_EMPLOYEES = [
 
     { id: 'E001', name: 'ريهام', role: 'مديرة الفرع', branch: 'miami' },
@@ -91,6 +101,19 @@ window.syncWithCloud = function () {
             EMPLOYEES = snap.val();
             localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
             console.log("✅ Employees synced");
+        }
+    });
+
+    // Real-time settings (Passwords etc)
+    db.ref(AppState.systemSecret + '/bms/settings').on('value', snap => {
+        if (!AppState.userRole) return;
+        if (snap.exists()) {
+            const data = snap.val();
+            if (data.managerPassword) {
+                AppState.managerPassword = data.managerPassword;
+                localStorage.setItem('bms_manager_pass', data.managerPassword);
+            }
+            console.log("✅ Settings synced");
         }
     });
 
@@ -439,7 +462,7 @@ function showLoginScreen() {
                 <span class="login-select-icon">🏢</span>
                 <select id="loginBranch" class="login-select" onchange="setLoginRole('branch')">
                     <option value="">فروع Report المتاحة</option>
-                    ${Object.entries(BRANCHES).map(([k, v]) => `<option value="${k}" ${savedBranch === k ? 'selected' : ''}>${v.name}</option>`).join('')}
+                    ${getSortedBranchesEntries(BRANCHES).map(([k, v]) => `<option value="${k}" ${savedBranch === k ? 'selected' : ''}>${v.name}</option>`).join('')}
                 </select>
             </div>
 
@@ -568,7 +591,7 @@ window.handleLoginSubmit = function () {
         return;
     }
 
-    if (pass === 'admin_2026') {
+    if (pass === AppState.managerPassword || pass === 'admin_2026') {
         loginAs('manager', null, remember, pass);
         return;
     }
@@ -579,16 +602,19 @@ window.handleLoginSubmit = function () {
     }
 
     if (role === 'branch') {
-        const branch = document.getElementById('loginBranch').value;
-        if (!branch) return showToast('يرجى اختيار الفرع من القائمة', 'error');
-        if (pass === '7788') {
-            loginAs('branch', branch, remember, pass);
+        const branchKey = document.getElementById('loginBranch').value;
+        if (!branchKey) return showToast('يرجى اختيار الفرع من القائمة', 'error');
+        
+        // Dynamic branch password check
+        const bPass = (BRANCHES[branchKey]?.password || '7788').trim();
+        
+        if (pass === bPass) {
+            loginAs('branch', branchKey, remember, pass);
         } else {
             showToast('كلمة مرور الفرع غير صحيحة!', 'error');
         }
     } else if (role === 'manager') {
-        // This handles cases where they change admin pass (if we ever allow it) or re-confirm
-        if (pass === 'admin_2026') {
+        if (pass === AppState.managerPassword) {
             loginAs('manager', null, remember, pass);
         } else {
             showToast('كلمة مرور الإدارة غير صحيحة!', 'error');
@@ -624,7 +650,7 @@ window.loginAs = function (role, branchKey, remember, pass) {
     updateNavVisibility();
     updateUserDisplay();
     syncWithCloud();
-    navigate('dashboard');
+    navigate(role === 'developer' ? 'admin' : 'dashboard');
 };
 
 // --- IndexedDB Local Backup Folder Storage ---
@@ -794,19 +820,20 @@ function updateNavVisibility() {
     // Manager: Dashboard, Finance, Employees (ALL READ ONLY)
     // Branch: Dashboard, Report, Finance (OWN)
 
+    document.getElementById('nav-dashboard').style.setProperty('display', (isDev) ? 'none' : '', 'important');
     document.getElementById('nav-report').style.setProperty('display', (isBranch) ? '' : 'none', 'important');
-    document.getElementById('nav-branches').style.setProperty('display', (isDev) ? '' : 'none', 'important');
+    document.getElementById('nav-branches').style.setProperty('display', (isDev) ? 'none' : (isDev ? '' : 'none'), 'important');
     document.getElementById('nav-employees').style.setProperty('display', (isDev) ? '' : 'none', 'important');
-    document.getElementById('nav-finance').style.setProperty('display', (isDev || isManager || isBranch) ? '' : 'none', 'important');
+    document.getElementById('nav-finance').style.setProperty('display', (isDev) ? 'none' : (isDev || isManager || isBranch ? '' : 'none'), 'important');
     const navDailyBudget = document.getElementById('nav-dailybudget');
-    if (navDailyBudget) navDailyBudget.style.setProperty('display', (isDev || isBranch) ? '' : 'none', 'important');
+    if (navDailyBudget) navDailyBudget.style.setProperty('display', (isDev) ? 'none' : (isDev || isBranch ? '' : 'none'), 'important');
     document.getElementById('nav-admin').style.setProperty('display', (isDev) ? '' : 'none', 'important');
 
-    // Branch selector in topbar — only for dev/manager
+    // Branch selector in topbar — only for manager (Dev doesn't need to filter operational reports)
     const branchSelArea = document.getElementById('topbarBranchSelector');
     if (branchSelArea) {
-        branchSelArea.style.display = (!isBranch) ? '' : 'none';
-        if (!isBranch) {
+        branchSelArea.style.display = (isManager) ? '' : 'none';
+        if (isManager) {
             branchSelArea.innerHTML = renderCustomBranchSelect('branchSelect', AppState.currentBranch || 'all', 'handleTopbarBranchChange');
         }
     }
@@ -837,6 +864,9 @@ function navigate(page) {
     const isBranch = AppState.userRole === 'branch';
 
     // Permission check
+    if (isDev && page === 'dashboard') {
+        page = 'admin';
+    }
     if (isBranch && ['branches', 'employees', 'admin'].includes(page)) {
         page = 'dashboard';
     }
@@ -909,7 +939,7 @@ function renderCustomBranchSelect(id, initialVal, callbackName) {
         </div>
         <div class="custom-options" id="${id}-options">
             <div class="custom-option" onclick="selectCustomOption('${id}','all','جميع الفروع (تقرير مجمع)','#001f3f','${callbackName}')">جميع الفروع (تقرير مجمع)</div>
-            ${Object.entries(branchList).map(([k, v]) => `
+            ${getSortedBranchesEntries(branchList).map(([k, v]) => `
                 <div class="custom-option" onclick="selectCustomOption('${id}','${k}','${v.name}','#001f3f','${callbackName}')">${v.name}</div>
             `).join('')}
         </div>
@@ -996,7 +1026,7 @@ function renderDashboard(el) {
     }
     const netRevenue = totalRevenue - totalExpenses;
 
-    const branchEntries = Object.entries(BRANCHES).filter(([k]) => k === AppState.userBranch);
+    const branchEntries = getSortedBranchesEntries(BRANCHES).filter(([k]) => k === AppState.userBranch);
 
     const branchData = branchEntries.map(([key, branch]) => {
         const bReports = allReports.filter(r => r?.branch === key);
@@ -1132,7 +1162,7 @@ function renderDashboard(el) {
 // -------------------------
 function renderManagerDashboard(el) {
     const allReports = AppState.reports;
-    let branchEntries = Object.entries(BRANCHES);
+    let branchEntries = getSortedBranchesEntries(BRANCHES);
     if (AppState.currentBranch && AppState.currentBranch !== 'all') {
         branchEntries = branchEntries.filter(([key]) => key === AppState.currentBranch);
     }
@@ -1503,7 +1533,7 @@ function renderReport(el, existingData = null) {
             ? `<div style="padding:12px; background:var(--bg-input); border-radius:12px; font-weight:bold; color:var(--primary); font-size:16px;">${BRANCHES[AppState.userBranch]?.name}</div>
                        <input type="hidden" id="branchSelect2" value="${AppState.userBranch}">`
             : `<select id="branchSelect2" onchange="reloadReportByDate()" style="padding:12px; border-radius:12px;">
-                        ${Object.entries(BRANCHES).map(([k, v]) => `<option value="${k}" ${k === (data.branch || AppState.userBranch || 'soyouf') ? 'selected' : ''}>${v.name}</option>`).join('')}
+                        ${getSortedBranchesEntries(BRANCHES).map(([k, v]) => `<option value="${k}" ${k === (data.branch || AppState.userBranch || 'soyouf') ? 'selected' : ''}>${v.name}</option>`).join('')}
                        </select>`
         }
             </div>
@@ -2578,14 +2608,6 @@ function renderAdmin(el) {
                 <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">هذا الاسم سيظهر في واجهة المدير العام وعند تسجيل الخروج.</p>
             </div>
             <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
-                <label>المفتاح السري (الماستر)</label>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="adminMasterPass" class="form-input" value="${AppState.masterPassword}" style="flex:1;">
-                    <button class="btn btn-primary" onclick="adminSaveMasterPass()">حفظ المفتاح</button>
-                </div>
-                <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">هذا المفتاح يتيح اختراق أي فرع والدخول كمبرمج وكشف الباسووردات.</p>
-            </div>
-            <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
                 <label>مسار حفظ النسخ الاحتياطية الإجباري للفروع</label>
                 <div style="display:flex; gap:10px; align-items:center;">
                     <div id="folderStatusBadge" style="padding: 10px; background: #fdf2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 13px; color: #991b1b; display: flex; align-items: center; gap: 8px;">
@@ -2616,6 +2638,34 @@ function renderAdmin(el) {
                            oninput="changeAppColor(this.value)" style="width:100%; max-width:300px; height:45px; border:none; cursor:pointer; border-radius:8px;">
                     <button class="btn btn-secondary" onclick="resetAppColor()" style="padding:6px 12px; font-size:12px;">إرجاع للوضع الأصلي</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== PASSWORDS SECTION ====== -->
+    <div class="form-section animate-in" style="border-color:#f1c40f;">
+        <div class="form-section-header" style="background:#fef9e7;color:#f39c12;">🔑 إدارة كلمات المرور</div>
+        <div class="form-section-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>المفتاح السري (الماستر)</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="adminMasterPass" class="form-input" value="${AppState.masterPassword}" placeholder="admin#135">
+                        <button class="btn btn-primary" onclick="adminSaveMasterPass()">حفظ</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>كلمة مرور الإدارة (المدير)</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="adminManagerPass" class="form-input" value="${AppState.managerPassword || 'admin_2026'}" placeholder="admin_2026">
+                        <button class="btn btn-primary" onclick="adminSaveManagerPass()">حفظ</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="border-top:1px solid var(--border-color);margin-top:20px;padding-top:20px;">
+                <h4 style="margin-bottom:14px;font-size:15px;color:var(--text-primary);">📍 كلمات مرور الفروع</h4>
+                <div id="adminPasswordList"></div>
             </div>
         </div>
     </div>
@@ -2674,7 +2724,7 @@ function renderAdmin(el) {
                     <div class="form-group">
                         <label>الفرع</label>
                         <select id="newEmpBranch">
-                            ${Object.entries(BRANCHES).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}
+                            ${getSortedBranchesEntries(BRANCHES).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}
                         </select>
                     </div>
                 </div>
@@ -2715,6 +2765,7 @@ function renderAdmin(el) {
 
     renderAdminBranchList();
     renderAdminEmployeeList();
+    renderAdminPasswordList();
     updateFolderStatusUI();
 }
 
@@ -2745,7 +2796,7 @@ async function updateFolderStatusUI() {
 function renderAdminBranchList() {
     const container = document.getElementById('adminBranchList');
     if (!container) return;
-    const entries = Object.entries(BRANCHES);
+    const entries = getSortedBranchesEntries(BRANCHES);
     if (entries.length === 0) {
         container.innerHTML = '<div class="empty-state"><span class="empty-icon">🏢</span><p>لا توجد فروع</p></div>';
         return;
@@ -2842,6 +2893,60 @@ window.adminSaveMasterPass = function () {
     localStorage.setItem('bms_master_pass', val);
     showToast('تم حفظ المفتاح الماستر بنجاح 🔒');
 };
+
+window.adminSaveManagerPass = function () {
+    const val = document.getElementById('adminManagerPass').value.trim();
+    if (!val) return showToast('يرجى إدخال كلمة سر صحيحة', 'error');
+    AppState.managerPassword = val;
+    localStorage.setItem('bms_manager_pass', val);
+    
+    // Cloud update if possible
+    if (window.db) {
+        db.ref(AppState.systemSecret + '/bms/settings/managerPassword').set(val);
+    }
+    
+    showToast('تم تحديث كلمة مرور المدير بنجاح ✅');
+};
+
+window.adminSaveBranchPass = function (key, val) {
+    if (!BRANCHES[key]) return;
+    BRANCHES[key].password = val.trim() || '7788';
+    saveData();
+    showToast(`تم تحديث كلمة مرور فرع ${BRANCHES[key].name}`, 'success');
+};
+
+function renderAdminPasswordList() {
+    const container = document.getElementById('adminPasswordList');
+    if (!container) return;
+    const entries = getSortedBranchesEntries(BRANCHES);
+    if (entries.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">لا توجد فروع لإدارة باسوورداتها</p>';
+        return;
+    }
+
+    container.innerHTML = `
+    <div class="table-wrapper"><table style="margin-top:10px;">
+        <thead><tr><th>الفرع</th><th>كلمة المرور الحالية</th><th>إجراء</th></tr></thead>
+        <tbody>
+            ${entries.map(([key, b]) => `
+                <tr>
+                    <td style="font-weight:700;color:var(--text-primary);">${b.name}</td>
+                    <td>
+                        <input type="text" class="form-input" value="${b.password || '7788'}" 
+                               style="width:120px;padding:5px 10px;text-align:center;font-family:monospace;"
+                               id="passInput_${key}">
+                    </td>
+                    <td>
+                        <button class="btn btn-secondary" style="padding:5px 15px;font-size:12px;" 
+                                onclick="adminSaveBranchPass('${key}', document.getElementById('passInput_${key}').value)">
+                            💾 حفظ
+                        </button>
+                    </td>
+                </tr>
+            `).join('')}
+        </tbody>
+    </table></div>`;
+}
 
 window.adminSaveBackupPath = async function () {
     if (window.showDirectoryPicker) {
