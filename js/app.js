@@ -1,6 +1,6 @@
-/* =============================================
+/* ===
    app.js — Branch Management SPA
-   ============================================= */
+   === */
 
 // -------------------------
 // State & Data Store
@@ -19,10 +19,10 @@ const AppState = {
     managerPassword: localStorage.getItem('bms_manager_pass') || 'admin_2026',
     backupPath: localStorage.getItem('bms_backup_path') || 'D:\\\\Backups-Report',
     ledgers: JSON.parse(localStorage.getItem('bms_ledgers') || '{}'),
-<<<<<<< HEAD
+
     trainers: JSON.parse(localStorage.getItem('bms_trainers') || '[]'),
-=======
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
+
     systemSecret: 'ReportV2_SecurePath_882', // Dynamic path for cloud data
     isInitialSyncComplete: false // Nitro-Block Protection
 };
@@ -71,14 +71,14 @@ const DEFAULT_EMPLOYEES = [
     { id: 'E016', name: 'ريهام', role: 'مديرة الفرع', branch: 'branch6' },
     { id: 'E017', name: 'س1', role: 'سكرتيرة', branch: 'branch6' },
     { id: 'E018', name: 'س2', role: 'سكرتيرة', branch: 'branch6' },
-<<<<<<< HEAD
+
 ];
 
 const DEFAULT_TRAINERS = [
     { id: 'T001', name: 'كابتن أحمد', specialty: 'لياقة بدنية', branch: 'miami', salary: 3000, percentage: 10 },
     { id: 'T002', name: 'كابتن سارة', specialty: 'يوجا', branch: 'mandara', salary: 2500, percentage: 15 }
-=======
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
+
 ];
 
 // Dynamic data — load from localStorage or seed from defaults
@@ -117,7 +117,7 @@ window.syncWithCloud = function () {
         }
     });
 
-<<<<<<< HEAD
+
     // Real-time trainers
     db.ref(AppState.systemSecret + '/bms/trainers').on('value', snap => {
         if (!AppState.userRole) return;
@@ -128,8 +128,8 @@ window.syncWithCloud = function () {
         }
     });
 
-=======
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
+
     // Real-time settings (Passwords etc)
     db.ref(AppState.systemSecret + '/bms/settings').on('value', snap => {
         if (!AppState.userRole) return;
@@ -263,17 +263,17 @@ function saveData() {
         updates['/trainers'] = TRAINERS || [];
         updates['/budgets'] = AppState.budgets || [];
 
-<<<<<<< HEAD
+
         // Overwrite ledgers to ensure clearing and full sync works correctly
         db.ref(AppState.systemSecret + '/bms/ledgers').set(AppState.ledgers || {});
 
         // Push bulk sets for other categories
-=======
+
         // Specially update ledgers to MERGE branch entries
         db.ref(AppState.systemSecret + '/bms/ledgers').update(AppState.ledgers || {});
 
         // Push bulk updates for other categories
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
         db.ref(AppState.systemSecret + '/bms').update(updates);
 
         console.log("☁️ Nitro-Sync: Cloud updated atomically.");
@@ -282,6 +282,10 @@ function saveData() {
 
 // Seed logic (only if Firebase is totally empty)
 function checkSeeding() {
+    if (!window.db) {
+        setTimeout(checkSeeding, 500);
+        return;
+    }
     db.ref(AppState.systemSecret + '/bms').once('value', snap => {
         if (!snap.exists()) {
             console.log("🌱 Initial seeding to cloud...");
@@ -397,7 +401,7 @@ function showToast(msg, type = 'success') {
     setTimeout(() => toast.remove(), 3500);
 }
 
-<<<<<<< HEAD
+
 window.customAlert = function (title, msg, type = 'success') {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Cairo,sans-serif;';
@@ -432,8 +436,8 @@ window.customAlert = function (title, msg, type = 'success') {
     document.body.appendChild(overlay);
 };
 
-=======
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
+
 window.customPrompt = function (title, defaultValue, callback) {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(5px);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Cairo,sans-serif;';
@@ -900,11 +904,11 @@ function updateNavVisibility() {
     document.getElementById('nav-finance').style.setProperty('display', (isDev) ? 'none' : (isDev || isManager || isBranch ? '' : 'none'), 'important');
     const navDailyBudget = document.getElementById('nav-dailybudget');
     if (navDailyBudget) navDailyBudget.style.setProperty('display', (isDev) ? 'none' : (isDev || isBranch ? '' : 'none'), 'important');
-<<<<<<< HEAD
+
     const navTrainers = document.getElementById('nav-trainers');
     if (navTrainers) navTrainers.style.setProperty('display', (isDev) ? 'none' : (isDev || isManager || isBranch ? '' : 'none'), 'important');
-=======
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
+
     document.getElementById('nav-admin').style.setProperty('display', (isDev) ? '' : 'none', 'important');
 
     // Branch selector in topbar — only for manager (Dev doesn't need to filter operational reports)
@@ -989,10 +993,10 @@ function navigate(page) {
         case 'report': renderReport(container); break;
         case 'branches': renderBranches(container); break;
         case 'employees': renderEmployees(container); break;
-<<<<<<< HEAD
+
         case 'trainers': renderTrainers(container); break;
-=======
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
+
         case 'finance': renderFinance(container); break;
         case 'dailybudget': renderDailyBudget(container); break;
         case 'admin': renderAdmin(container); break;
@@ -2884,10 +2888,10 @@ function renderAdmin(el) {
 
     renderAdminBranchList();
     renderAdminEmployeeList();
-<<<<<<< HEAD
+
     renderAdminTrainerList();
-=======
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
+
     renderAdminPasswordList();
     updateFolderStatusUI();
 }
@@ -3081,7 +3085,7 @@ window.adminSaveManagerPass = function () {
 
 window.adminSaveBranchPass = function (key, val) {
     if (!BRANCHES[key]) return;
-<<<<<<< HEAD
+
     const pass = val.trim() || '7788';
     BRANCHES[key].password = pass;
     
@@ -3096,11 +3100,11 @@ window.adminSaveBranchPass = function (key, val) {
     }
     
     showToast(`تم تحديث كلمة مرور فرع ${BRANCHES[key].name} أونلاين ✅`, 'success');
-=======
+
     BRANCHES[key].password = val.trim() || '7788';
     saveData();
     showToast(`تم تحديث كلمة مرور فرع ${BRANCHES[key].name}`, 'success');
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
 };
 
 function renderAdminPasswordList() {
@@ -3270,12 +3274,12 @@ window.adminAddEmployee = function () {
 };
 
 window.adminClearReports = function () {
-<<<<<<< HEAD
+
     if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع التقارير اليومية واليوميات المالية نهائياً!')) return;
     
-=======
+
     if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع التقارير اليومية نهائياً!')) return;
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
     AppState.reports = [];
     AppState.ledgers = {};
     
@@ -3297,11 +3301,11 @@ window.adminClearEmployees = function () {
 };
 
 window.adminClearBranches = function () {
-<<<<<<< HEAD
+
     if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع الفروع وكل ما يتعلق بها!')) return;
-=======
+
     if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع الفروع وجميع الموظفين معهم!')) return;
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
     BRANCHES = {};
     EMPLOYEES = [];
     AppState.reports = [];
@@ -3314,12 +3318,12 @@ window.adminClearBranches = function () {
 };
 
 window.adminResetAll = function () {
-<<<<<<< HEAD
+
     if (!confirm('⛔ هل أنت متأكد من إعادة ضبط المصنع الكامل؟\n\nسيتم حذف:\n• جميع الفروع\n• جميع الموظفين\n• جميع التقارير\n• جميع الحركات المالية (اليوميات)\n\nوإعادتها للإعدادات الافتراضية!')) return;
     
-=======
+
     if (!confirm('⛔ هل أنت متأكد من إعادة ضبط المصنع الكامل؟\n\nسيتم حذف:\n• جميع الفروع\n• جميع الموظفين\n• جميع التقارير\n\nوإعادتها للإعدادات الافتراضية!')) return;
->>>>>>> 41d59a3e05a4bea0d5f3580ff06d366b2d6ba833
+
     BRANCHES = { ...DEFAULT_BRANCHES };
     EMPLOYEES = [...DEFAULT_EMPLOYEES];
     TRAINERS = [...DEFAULT_TRAINERS];
