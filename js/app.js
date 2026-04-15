@@ -16,64 +16,81 @@ const AppState = {
     userBranch: localStorage.getItem('bms_branch'),
     managerName: localStorage.getItem('bms_manager_name') || 'المدير العام',
     masterPassword: localStorage.getItem('bms_master_pass') || 'admin#135',
+    managerPassword: localStorage.getItem('bms_manager_pass') || 'admin_2026',
     backupPath: localStorage.getItem('bms_backup_path') || 'D:\\\\Backups-Report',
-    ledgers: JSON.parse(localStorage.getItem('bms_ledgers') || '{}'), 
+    ledgers: JSON.parse(localStorage.getItem('bms_ledgers') || '{}'),
+    trainers: JSON.parse(localStorage.getItem('bms_trainers') || '[]'),
     systemSecret: 'ReportV2_SecurePath_882', // Dynamic path for cloud data
     isInitialSyncComplete: false // Nitro-Block Protection
 };
 
 // Default data (used for seeding if no localStorage)
 const DEFAULT_BRANCHES = {
-
-    miami:    { name: 'فرع ميامي',    city: 'الإسكندرية', color: '#1a5276' },
-    mandara:  { name: 'فرع المندرة', city: 'الإسكندرية', color: '#512e5f' },
-    soyouf:   { name: 'فرع السيوف',   city: 'الإسكندرية', color: '#8B0000' },
-    smouha:   { name: 'فرع سموحة',    city: 'الإسكندرية', color: '#1d6a3e' },
-    agamy:    { name: 'فرع العجمي',   city: 'الإسكندرية', color: '#7d6608' },
-    branch6:  { name: 'الفرع السادس', city: 'الإسكندرية', color: '#2c3e50' },
+    miami: { name: 'فرع ميامى', city: 'الإسكندرية', color: '#1a5276' },
+    mandara: { name: 'فرع المندرة', city: 'الإسكندرية', color: '#512e5f' },
+    soyouf: { name: 'فرع السيوف', city: 'الإسكندرية', color: '#8B0000' },
+    smouha: { name: 'فرع سموحة', city: 'الإسكندرية', color: '#1d6a3e' },
+    agamy: { name: 'فرع العجمى', city: 'الإسكندرية', color: '#7d6608' },
+    branch6: { name: 'فرع السادس', city: 'الإسكندرية', color: '#2c3e50' },
 };
+
+const BRANCH_ORDER = ['miami', 'mandara', 'soyouf', 'smouha', 'agamy', 'branch6'];
+function getSortedBranchesEntries(obj) {
+    const list = obj || BRANCHES;
+    return Object.entries(list).sort((a, b) => {
+        const idxA = BRANCH_ORDER.indexOf(a[0]);
+        const idxB = BRANCH_ORDER.indexOf(b[0]);
+        return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+    });
+}
 const DEFAULT_EMPLOYEES = [
 
-    { id: 'E001', name: 'ريهام',    role: 'مديرة الفرع', branch: 'miami' },
-    { id: 'E002', name: 'نورهان',   role: 'سكرتيرة',    branch: 'miami' },
-    { id: 'E003', name: 'سارة',     role: 'سكرتيرة',    branch: 'miami' },
+    { id: 'E001', name: 'ريهام', role: 'مديرة الفرع', branch: 'miami' },
+    { id: 'E002', name: 'نورهان', role: 'سكرتيرة', branch: 'miami' },
+    { id: 'E003', name: 'سارة', role: 'سكرتيرة', branch: 'miami' },
 
-    { id: 'E004', name: 'روان',     role: 'مديرة الفرع', branch: 'mandara' },
-    { id: 'E005', name: 'منة خليل', role: 'سكرتيرة',    branch: 'mandara' },
-    { id: 'E006', name: 'دينا',     role: 'سكرتيرة',    branch: 'mandara' },
+    { id: 'E004', name: 'روان', role: 'مديرة الفرع', branch: 'mandara' },
+    { id: 'E005', name: 'منة خليل', role: 'سكرتيرة', branch: 'mandara' },
+    { id: 'E006', name: 'دينا', role: 'سكرتيرة', branch: 'mandara' },
 
-    { id: 'E007', name: 'راوية',    role: 'مديرة الفرع', branch: 'soyouf' },
-    { id: 'E008', name: 'دعاء',     role: 'سكرتيرة',    branch: 'soyouf' },
-    { id: 'E009', name: 'روان',     role: 'سكرتيرة',    branch: 'soyouf' },
+    { id: 'E007', name: 'راوية', role: 'مديرة الفرع', branch: 'soyouf' },
+    { id: 'E008', name: 'دعاء', role: 'سكرتيرة', branch: 'soyouf' },
+    { id: 'E009', name: 'روان', role: 'سكرتيرة', branch: 'soyouf' },
 
-    { id: 'E010', name: 'هدى',      role: 'مديرة الفرع', branch: 'smouha' },
-    { id: 'E011', name: 'حبيبة صلاح',    role: 'سكرتيرة',    branch: 'smouha' },
-    { id: 'E012', name: 'حبيبة خليل', role: 'سكرتيرة',  branch: 'smouha' },
+    { id: 'E010', name: 'هدى', role: 'مديرة الفرع', branch: 'smouha' },
+    { id: 'E011', name: 'حبيبة صلاح', role: 'سكرتيرة', branch: 'smouha' },
+    { id: 'E012', name: 'حبيبة خليل', role: 'سكرتيرة', branch: 'smouha' },
 
-    { id: 'E013', name: 'رضوى',     role: 'مديرة الفرع', branch: 'agamy' },
-    { id: 'E014', name: 'بسمة',     role: 'سكرتيرة',    branch: 'agamy' },
-    { id: 'E015', name: 'أروى',     role: 'سكرتيرة',    branch: 'agamy' },
+    { id: 'E013', name: 'رضوى', role: 'مديرة الفرع', branch: 'agamy' },
+    { id: 'E014', name: 'بسمة', role: 'سكرتيرة', branch: 'agamy' },
+    { id: 'E015', name: 'أروى', role: 'سكرتيرة', branch: 'agamy' },
 
-    { id: 'E016', name: 'ريهام',    role: 'مديرة الفرع', branch: 'branch6' },
-    { id: 'E017', name: 'س1',       role: 'سكرتيرة',    branch: 'branch6' },
-    { id: 'E018', name: 'س2',       role: 'سكرتيرة',    branch: 'branch6' },
+    { id: 'E016', name: 'ريهام', role: 'مديرة الفرع', branch: 'branch6' },
+    { id: 'E017', name: 'س1', role: 'سكرتيرة', branch: 'branch6' },
+    { id: 'E018', name: 'س2', role: 'سكرتيرة', branch: 'branch6' },
+];
+
+const DEFAULT_TRAINERS = [
+    { id: 'T001', name: 'كابتن أحمد', specialty: 'لياقة بدنية', branch: 'miami', salary: 3000, percentage: 10 },
+    { id: 'T002', name: 'كابتن سارة', specialty: 'يوجا', branch: 'mandara', salary: 2500, percentage: 15 }
 ];
 
 // Dynamic data — load from localStorage or seed from defaults
-let BRANCHES = JSON.parse(localStorage.getItem('bms_branches') || 'null') || {...DEFAULT_BRANCHES};
+let BRANCHES = JSON.parse(localStorage.getItem('bms_branches') || 'null') || { ...DEFAULT_BRANCHES };
 let EMPLOYEES = JSON.parse(localStorage.getItem('bms_employees') || 'null') || [...DEFAULT_EMPLOYEES];
+let TRAINERS = JSON.parse(localStorage.getItem('bms_trainers') || 'null') || [...DEFAULT_TRAINERS];
 
 // -------------------------
 // Firebase Sync & Cloud Storage
 // -------------------------
-window.syncWithCloud = function() {
+window.syncWithCloud = function () {
     if (!window.db) {
         // Try again in 500ms if not ready yet
         setTimeout(syncWithCloud, 500);
         return console.warn("⏳ Waiting for Firebase initialization...");
     }
     console.log("☁️ Syncing with cloud...");
-    
+
     // Real-time branches
     db.ref(AppState.systemSecret + '/bms/branches').on('value', snap => {
         if (!AppState.userRole) return;
@@ -94,16 +111,56 @@ window.syncWithCloud = function() {
         }
     });
 
+    // Real-time trainers
+    db.ref(AppState.systemSecret + '/bms/trainers').on('value', snap => {
+        if (!AppState.userRole) return;
+        if (snap.exists()) {
+            TRAINERS = snap.val();
+            localStorage.setItem('bms_trainers', JSON.stringify(TRAINERS));
+            console.log("✅ Trainers synced");
+        }
+    });
+
+    // Real-time settings (Passwords etc)
+    db.ref(AppState.systemSecret + '/bms/settings').on('value', snap => {
+        if (!AppState.userRole) return;
+        if (snap.exists()) {
+            const data = snap.val();
+            if (data.managerPassword) {
+                AppState.managerPassword = data.managerPassword;
+                localStorage.setItem('bms_manager_pass', data.managerPassword);
+            }
+            console.log("✅ Settings synced");
+        }
+    });
+
     // Real-time reports
     db.ref(AppState.systemSecret + '/bms/reports').on('value', snap => {
         if (!AppState.userRole) return;
-        if (snap.exists()) {
-            const raw = snap.val();
-            AppState.reports = Array.isArray(raw) ? raw : Object.values(raw);
-            localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
-            console.log("✅ Reports synced");
-            if (AppState.currentPage === 'dashboard') navigate('dashboard');
-        }
+        try {
+            if (snap.exists()) {
+                const raw = snap.val();
+                const reportsArray = Array.isArray(raw) ? raw : (raw ? Object.values(raw) : []);
+                const deduplicated = deduplicateReports(reportsArray);
+                
+                // Set reports locally but DON'T call saveData here to avoid infinite loops
+                AppState.reports = deduplicated;
+                localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
+                console.log("✅ Reports synced & deduplicated");
+                
+                // UI Refresh
+                if (AppState.currentPage === 'dashboard') renderDashboard(document.getElementById('pageContent'));
+                if (AppState.currentPage === 'finance') renderFinance(document.getElementById('pageContent'));
+                if (AppState.currentPage === 'report') {
+                    const ctxB = document.getElementById('branchSelect2')?.value;
+                    const ctxD = document.getElementById('reportDate')?.value;
+                    if (ctxB && ctxD) {
+                        const existing = AppState.reports.find(r => r.branch === ctxB && r.date === ctxD);
+                        if (existing) renderReport(document.getElementById('pageContent'), existing);
+                    }
+                }
+            }
+        } catch(e) { console.error("Sync Error (Reports):", e); }
     });
 
     // Real-time budgets
@@ -114,7 +171,7 @@ window.syncWithCloud = function() {
             AppState.budgets = Array.isArray(raw) ? raw : Object.values(raw);
             localStorage.setItem('bms_budgets', JSON.stringify(AppState.budgets));
             console.log("✅ Budgets synced");
-            if (AppState.currentPage === 'dailybudget') navigate('dailybudget');
+            if (AppState.currentPage === 'dailybudget') renderDailyBudget(document.getElementById('pageContent'));
         }
     });
 
@@ -125,7 +182,7 @@ window.syncWithCloud = function() {
             AppState.ledgers = snap.val();
             localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
             console.log("✅ Ledgers synced");
-            
+
             // Mark sync as complete on first data arrival
             if (!AppState.isInitialSyncComplete) {
                 AppState.isInitialSyncComplete = true;
@@ -141,7 +198,7 @@ window.syncWithCloud = function() {
 
             if (AppState.currentPage === 'dailybudget') renderDailyBudget(document.getElementById('pageContent'));
             if (AppState.currentPage === 'dashboard') renderDashboard(document.getElementById('pageContent'));
-            // Removal of automatic report re-render to prevent UI freezing during sync
+            if (AppState.currentPage === 'finance') renderFinance(document.getElementById('pageContent'));
         } else {
             // Even if empty, connection established
             if (!AppState.isInitialSyncComplete) {
@@ -178,9 +235,10 @@ function saveData() {
     localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
     localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
     localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
+    localStorage.setItem('bms_trainers', JSON.stringify(TRAINERS));
     localStorage.setItem('bms_budgets', JSON.stringify(AppState.budgets));
     localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
-    
+
     // 2. NITRO-BLOCK: Safety check before pushing to cloud
     if (window.db) {
         if (!AppState.isInitialSyncComplete) {
@@ -193,14 +251,15 @@ function saveData() {
         updates['/reports'] = AppState.reports || [];
         updates['/branches'] = BRANCHES || {};
         updates['/employees'] = EMPLOYEES || [];
+        updates['/trainers'] = TRAINERS || [];
         updates['/budgets'] = AppState.budgets || [];
-        
-        // Specially update ledgers to MERGE branch entries
-        db.ref(AppState.systemSecret + '/bms/ledgers').update(AppState.ledgers || {});
-        
-        // Push bulk updates for other categories
+
+        // Overwrite ledgers to ensure clearing and full sync works correctly
+        db.ref(AppState.systemSecret + '/bms/ledgers').set(AppState.ledgers || {});
+
+        // Push bulk sets for other categories
         db.ref(AppState.systemSecret + '/bms').update(updates);
-        
+
         console.log("☁️ Nitro-Sync: Cloud updated atomically.");
     }
 }
@@ -214,6 +273,7 @@ function checkSeeding() {
             db.ref(AppState.systemSecret + '/bms/employees').set(DEFAULT_EMPLOYEES);
             db.ref(AppState.systemSecret + '/bms/reports').set([]);
             db.ref(AppState.systemSecret + '/bms/budgets').set([]);
+            db.ref(AppState.systemSecret + '/bms/trainers').set(DEFAULT_TRAINERS);
         }
     });
 }
@@ -225,19 +285,90 @@ function formatNumber(n) {
     return Number(n || 0).toLocaleString('en-US'); // Force English numerals
 }
 
+function normalizeArabic(s) {
+    if (!s) return "";
+    return String(s)
+        .replace(/[ىي]/g, 'ي')
+        .replace(/[أإآا]/g, 'ا')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function deduplicateReports(reports) {
+    if (!Array.isArray(reports)) return [];
+    const map = new Map();
+    
+    // Create a lookup for branch keys by normalized name
+    const branchNameMap = {};
+    if (typeof BRANCHES !== 'undefined' && BRANCHES) {
+        Object.entries(BRANCHES).forEach(([k, v]) => {
+            if (v && v.name) {
+                branchNameMap[normalizeArabic(v.name)] = k;
+            }
+        });
+    }
+
+    reports.forEach(r => {
+        if (!r || !r.branch || !r.date) return;
+
+        // --- Normalization Logic ---
+        // 1. Normalize Branch: Convert name to key or keep key
+        let bKey = normalizeArabic(r.branch);
+        if (branchNameMap[bKey]) {
+            bKey = branchNameMap[bKey];
+        } else {
+            // Check if it's already a valid key
+            if (typeof BRANCHES !== 'undefined' && BRANCHES) {
+                const foundByKey = Object.keys(BRANCHES).find(k => k === bKey);
+                if (foundByKey) bKey = foundByKey;
+            }
+        }
+
+        // Apply normalized branch key back to the report object for consistency
+        r.branch = bKey;
+
+        // 2. Normalize Date: Ensure YYYY-MM-DD
+        const dKey = String(r.date).trim();
+        const key = `${bKey}_${dKey}`;
+
+        if (map.has(key)) {
+            const existing = map.get(key);
+            // Merge logic: keep the one with more data
+            const rFin = r.financials || {};
+            const eFin = existing.financials || {};
+            
+            // Score based on presence of key values
+            const rScore = (rFin.totalNet ? 3 : 0) + (rFin.dailyInflow ? 2 : 0) + (rFin.inflowList?.length || 0) + (r.id ? 1 : 0);
+            const eScore = (eFin.totalNet ? 3 : 0) + (eFin.dailyInflow ? 2 : 0) + (eFin.inflowList?.length || 0) + (existing.id ? 1 : 0);
+
+            if (rScore >= eScore) {
+                map.set(key, r);
+            }
+        } else {
+            map.set(key, r);
+        }
+    });
+    
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function today() {
     return new Date().toISOString().split('T')[0];
 }
 
 function arabicDate(dateStr) {
     let d;
-    if (dateStr) {
-        const [y, m, day] = dateStr.split('-').map(Number);
-        d = new Date(y, m - 1, day);
-    } else {
-        d = new Date();
+    try {
+        if (dateStr) {
+            const [y, m, day] = dateStr.split('-').map(Number);
+            d = new Date(y, m - 1, day);
+        } else {
+            d = new Date();
+        }
+        return d.toLocaleDateString('ar-EG-u-nu-latn', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    } catch(e) {
+        return dateStr || "تاريخ غير صالح";
     }
-    return d.toLocaleDateString('ar-EG-u-nu-latn', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 function showToast(msg, type = 'success') {
@@ -250,18 +381,52 @@ function showToast(msg, type = 'success') {
     setTimeout(() => toast.remove(), 3500);
 }
 
-window.customPrompt = function(title, defaultValue, callback) {
+window.customAlert = function (title, msg, type = 'success') {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Cairo,sans-serif;';
+
+    const box = document.createElement('div');
+    box.className = 'form-section animate-glow-in';
+    box.style.cssText = 'background:var(--bg-card);border:1px solid var(--border-color);border-radius:20px;padding:40px;width:90%;max-width:500px;box-shadow:0 25px 50px rgba(0,0,0,0.5);text-align:center;border-top:6px solid ' + (type === 'success' ? '#27ae60' : '#e74c3c') + ';';
+
+    const iconEl = document.createElement('div');
+    iconEl.textContent = type === 'success' ? '✅' : '⚠️';
+    iconEl.style.cssText = 'font-size:60px;margin-bottom:20px;';
+
+    const titleEl = document.createElement('h2');
+    titleEl.textContent = title;
+    titleEl.style.cssText = 'color:var(--text-primary);margin-bottom:15px;font-size:24px;font-weight:bold;';
+
+    const msgEl = document.createElement('p');
+    msgEl.textContent = msg;
+    msgEl.style.cssText = 'color:var(--text-secondary);margin-bottom:30px;font-size:18px;line-height:1.6;';
+
+    const okBtn = document.createElement('button');
+    okBtn.textContent = 'حسناً، تم الانتهاء';
+    okBtn.className = 'btn btn-primary';
+    okBtn.style.cssText = 'padding:12px 60px; font-size:18px; border-radius:12px;';
+    okBtn.onclick = () => overlay.remove();
+
+    box.appendChild(iconEl);
+    box.appendChild(titleEl);
+    box.appendChild(msgEl);
+    box.appendChild(okBtn);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+};
+
+window.customPrompt = function (title, defaultValue, callback) {
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(5px);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Cairo,sans-serif;';
-    
+
     const box = document.createElement('div');
     box.className = 'form-section animate-glow-in';
     box.style.cssText = 'background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:24px;width:90%;max-width:400px;box-shadow:0 15px 35px rgba(0,0,0,0.4);border-top:4px solid var(--primary);';
-    
+
     const titleEl = document.createElement('h3');
     titleEl.textContent = title;
     titleEl.style.cssText = 'color:var(--text-primary);margin-bottom:16px;font-size:16px;font-weight:bold;';
-    
+
     const input = document.createElement('input');
     input.type = 'text';
     input.value = defaultValue || '';
@@ -269,28 +434,28 @@ window.customPrompt = function(title, defaultValue, callback) {
     input.style.cssText = 'width:100%;padding:12px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);border-radius:8px;font-family:Cairo;font-size:15px;margin-bottom:20px; outline:none; transition:0.3s;';
     input.onfocus = () => input.style.borderColor = 'var(--primary)';
     input.onblur = () => input.style.borderColor = 'var(--border-color)';
-    
+
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;gap:12px;justify-content:flex-end;';
-    
+
     const saveBtn = document.createElement('button');
     saveBtn.textContent = 'حفظ التعديل';
     saveBtn.className = 'btn btn-primary';
     saveBtn.style.padding = '8px 24px';
-    
+
     const cancelBtn = document.createElement('button');
     cancelBtn.textContent = 'إلغاء';
     cancelBtn.style.cssText = 'padding:8px 20px;background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);border-radius:8px;cursor:pointer;';
-    
+
     const close = (val) => {
         overlay.remove();
         if (val !== null) callback(val);
     };
-    
+
     saveBtn.onclick = () => close(input.value);
     cancelBtn.onclick = () => close(null);
     input.onkeyup = (e) => { if (e.key === 'Enter') close(input.value); if (e.key === 'Escape') close(null); };
-    
+
     btnRow.appendChild(cancelBtn);
     btnRow.appendChild(saveBtn);
     box.appendChild(titleEl);
@@ -298,7 +463,7 @@ window.customPrompt = function(title, defaultValue, callback) {
     box.appendChild(btnRow);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
-    
+
     setTimeout(() => {
         input.focus();
         input.setSelectionRange(0, input.value.length);
@@ -329,7 +494,7 @@ function showLoginScreen() {
 
     const container = document.getElementById('pageContent');
     if (!container) return;
-    
+
     container.style.padding = '0';
     const savedRole = localStorage.getItem('bms_saved_role');
     const savedBranch = localStorage.getItem('bms_saved_branch');
@@ -351,7 +516,7 @@ function showLoginScreen() {
                 <span class="login-select-icon">🏢</span>
                 <select id="loginBranch" class="login-select" onchange="setLoginRole('branch')">
                     <option value="">فروع Report المتاحة</option>
-                    ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}" ${savedBranch === k ? 'selected' : ''}>${v.name}</option>`).join('')}
+                    ${getSortedBranchesEntries(BRANCHES).map(([k, v]) => `<option value="${k}" ${savedBranch === k ? 'selected' : ''}>${v.name}</option>`).join('')}
                 </select>
             </div>
 
@@ -384,7 +549,7 @@ function showLoginScreen() {
     window._currentLoginRole = savedRole || null;
 }
 
-window.togglePassView = function() {
+window.togglePassView = function () {
     const input = document.getElementById('loginPass');
     const icon = document.getElementById('passToggle');
     if (input.type === 'password') {
@@ -398,10 +563,10 @@ window.togglePassView = function() {
     }
 };
 
-window.setLoginRole = function(role) {
+window.setLoginRole = function (role) {
     // Independent Developer Login Path
     if (role === 'developer') {
-        customPrompt('🔐 دخول المبرمج — أدخل الكود الماستر', '', function(pass) {
+        customPrompt('🔐 دخول المبرمج — أدخل الكود الماستر', '', function (pass) {
             if (!pass) return;
             const master = (AppState.masterPassword || '').trim();
             if (pass.trim() === master || pass.trim() === 'admin135') {
@@ -415,7 +580,7 @@ window.setLoginRole = function(role) {
     }
 
     window._currentLoginRole = role;
-    
+
     // Visual toggling
     document.querySelectorAll('.login-btn-admin, .login-select-wrapper').forEach(el => el.classList.remove('active'));
     if (role === 'manager') document.querySelector('.login-btn-admin').classList.add('active');
@@ -424,10 +589,10 @@ window.setLoginRole = function(role) {
     const area = document.getElementById('loginPassArea');
     const subtitle = document.querySelector('.login-subtitle');
     if (!area) return;
-    
+
     if (role === 'developer' && subtitle) subtitle.textContent = 'تسجيل دخول: المبرمج';
     if (role === 'manager' && subtitle) subtitle.textContent = 'تسجيل دخول: الإدارة الرئيسية';
-    
+
     if (role === 'branch') {
         const sel = document.getElementById('loginBranch');
         if (sel && sel.selectedIndex > 0 && subtitle) {
@@ -441,34 +606,34 @@ window.setLoginRole = function(role) {
             return;
         }
     }
-    
+
     area.style.display = 'block';
     area.style.animation = 'none';
     setTimeout(() => area.style.animation = 'slideUp 0.3s ease both', 10);
     setTimeout(() => document.getElementById('loginPass')?.focus(), 150);
 };
 
-window.handleForgotPass = function() {
+window.handleForgotPass = function () {
     const role = window._currentLoginRole;
     if (!role) {
         return showToast('يرجى تحديد فرع أو حساب أولاً لمعرفة كلمة سره', 'error');
     }
-    
+
     const input = prompt('🛡️ استعادة الوصول:\nيرجى إدخال كلمة السر الماستر لمعرفة كلمة المرور الخاصة بهذا الحساب:');
-    
+
     if (input === AppState.masterPassword) {
         let passToShow = '';
         if (role === 'developer') passToShow = AppState.masterPassword;
         else if (role === 'manager') passToShow = 'admin';
         else if (role === 'branch') passToShow = '1111';
-        
+
         alert(`✅ الكود السري الصحيح للحساب هو:\n\n[ ${passToShow} ]`);
     } else if (input) {
         showToast('كلمة السر الماستر غير صحيحة!', 'error');
     }
 };
 
-window.handleLoginSubmit = function() {
+window.handleLoginSubmit = function () {
     let role = window._currentLoginRole;
     const pass = document.getElementById('loginPass').value.trim();
     const remember = document.getElementById('loginRemember').checked;
@@ -479,8 +644,8 @@ window.handleLoginSubmit = function() {
         loginAs('developer', null, remember, pass);
         return;
     }
-    
-    if (pass === 'admin_2026') {
+
+    if (pass === AppState.managerPassword || pass === 'admin_2026') {
         loginAs('manager', null, remember, pass);
         return;
     }
@@ -491,16 +656,19 @@ window.handleLoginSubmit = function() {
     }
 
     if (role === 'branch') {
-        const branch = document.getElementById('loginBranch').value;
-        if (!branch) return showToast('يرجى اختيار الفرع من القائمة', 'error');
-        if (pass === '7788') {
-            loginAs('branch', branch, remember, pass);
+        const branchKey = document.getElementById('loginBranch').value;
+        if (!branchKey) return showToast('يرجى اختيار الفرع من القائمة', 'error');
+        
+        // Dynamic branch password check
+        const bPass = (BRANCHES[branchKey]?.password || '7788').trim();
+        
+        if (pass === bPass) {
+            loginAs('branch', branchKey, remember, pass);
         } else {
             showToast('كلمة مرور الفرع غير صحيحة!', 'error');
         }
     } else if (role === 'manager') {
-        // This handles cases where they change admin pass (if we ever allow it) or re-confirm
-        if (pass === 'admin_2026') {
+        if (pass === AppState.managerPassword) {
             loginAs('manager', null, remember, pass);
         } else {
             showToast('كلمة مرور الإدارة غير صحيحة!', 'error');
@@ -508,7 +676,7 @@ window.handleLoginSubmit = function() {
     }
 };
 
-window.loginAs = function(role, branchKey, remember, pass) {
+window.loginAs = function (role, branchKey, remember, pass) {
     AppState.userRole = role;
     AppState.userBranch = branchKey || null;
 
@@ -536,7 +704,7 @@ window.loginAs = function(role, branchKey, remember, pass) {
     updateNavVisibility();
     updateUserDisplay();
     syncWithCloud();
-    navigate('dashboard');
+    navigate(role === 'developer' ? 'admin' : 'dashboard');
 };
 
 // --- IndexedDB Local Backup Folder Storage ---
@@ -556,7 +724,7 @@ async function getSavedDirHandle() {
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
         });
-    } catch(e) { return null; }
+    } catch (e) { return null; }
 }
 
 async function saveDirHandle(handle) {
@@ -568,10 +736,10 @@ async function saveDirHandle(handle) {
             req.onsuccess = () => resolve(true);
             req.onerror = () => reject(req.error);
         });
-    } catch(e) { return false; }
+    } catch (e) { return false; }
 }
 
-window.createLocalBackup = async function(isSilent = false) {
+window.createLocalBackup = async function (isSilent = false) {
     try {
         const payload = {
             reports: AppState.reports,
@@ -585,7 +753,7 @@ window.createLocalBackup = async function(isSilent = false) {
 
         if (window.showDirectoryPicker) {
             let dirHandle = await getSavedDirHandle();
-            
+
             // If not linked and not silent, force link now
             if (!dirHandle && !isSilent) {
                 const confirmLink = confirm('⚠️ لم يتم ربط مجلد النسخ الاحتياطية بعد!\n\nيجب تحديد المجلد (D:\\Backups-Report) الآن ليتم الحفظ بداخله تلقائياً.');
@@ -595,7 +763,7 @@ window.createLocalBackup = async function(isSilent = false) {
                     updateFolderStatusUI();
                 }
             }
-            
+
             if (dirHandle) {
                 // Verify/Request permission explicitly
                 if (await dirHandle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
@@ -608,7 +776,7 @@ window.createLocalBackup = async function(isSilent = false) {
                         throw new Error('No user gesture for permission');
                     }
                 }
-                
+
                 const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
                 const writable = await fileHandle.createWritable();
                 await writable.write(JSON.stringify(payload, null, 2));
@@ -617,9 +785,9 @@ window.createLocalBackup = async function(isSilent = false) {
                 return;
             }
         }
-        
+
         if (!isSilent) fallbackDownload(payload, fileName);
-    } catch(e) {
+    } catch (e) {
         console.error('Backup fail:', e);
         if (!isSilent) fallbackDownload(payload, `BMS_Backup_${today()}.json`);
     }
@@ -636,34 +804,37 @@ function fallbackDownload(payload, fileName) {
     showToast('تم الحفظ في مسار التنزيلات الافتراضي', 'success');
 }
 
-window.forceSyncData = async function() {
+window.forceSyncData = async function () {
     if (!window.db) return showToast('تعذر الاتصال بقاعدة البيانات', 'error');
-    
+
     showToast('جاري سحب البيانات العميقة من السحابة... ⏳');
-    
+
     try {
         const snap = await db.ref(AppState.systemSecret + '/bms').once('value');
         if (snap.exists()) {
             const data = snap.val();
-            
+
             // Core Data Sync with Array Correction
-            if (data.reports) AppState.reports = Array.isArray(data.reports) ? data.reports : Object.values(data.reports);
+            if (data.reports) {
+                const reportsArray = Array.isArray(data.reports) ? data.reports : Object.values(data.reports);
+                AppState.reports = deduplicateReports(reportsArray);
+            }
             if (data.ledgers) AppState.ledgers = data.ledgers;
             if (data.budgets) AppState.budgets = Array.isArray(data.budgets) ? data.budgets : Object.values(data.budgets);
             if (data.branches) BRANCHES = data.branches;
             if (data.employees) EMPLOYEES = Array.isArray(data.employees) ? data.employees : Object.values(data.employees);
-            
+
             // Save to local storage
             localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
             localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
             localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
             localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
-            
+
             // Update Nitro Flag
             AppState.isInitialSyncComplete = true;
-            
+
             showToast('تم تحديث البيانات من السحابة بنجاح ✅', 'success');
-            
+
             // Force Full UI Refresh
             navigate(AppState.currentPage);
         }
@@ -673,23 +844,23 @@ window.forceSyncData = async function() {
     }
 };
 
-window.logout = function() {
+window.logout = function () {
     // 1. Save data before clearing if we have a role
     if (AppState.userRole) {
         saveData();
         // Trigger a silent backup attempt
-        try { createLocalBackup(true); } catch(e) {}
+        try { createLocalBackup(true); } catch (e) { }
     }
-    
+
     // 2. Clear Session State
     AppState.userRole = null;
     AppState.userBranch = null;
-    
+
     // 3. Clear Login Credentials from persistence
     localStorage.removeItem('bms_role');
     localStorage.removeItem('bms_branch');
     localStorage.setItem('bms_auto_login', 'false');
-    
+
     // 4. Force reload to clear all active Firebase listeners and reset memory
     window.location.reload();
 };
@@ -703,20 +874,24 @@ function updateNavVisibility() {
     // Manager: Dashboard, Finance, Employees (ALL READ ONLY)
     // Branch: Dashboard, Report, Finance (OWN)
 
+    document.getElementById('nav-dashboard').style.setProperty('display', (isDev) ? 'none' : '', 'important');
     document.getElementById('nav-report').style.setProperty('display', (isBranch) ? '' : 'none', 'important');
-    document.getElementById('nav-branches').style.setProperty('display', (isDev) ? '' : 'none', 'important');
-    document.getElementById('nav-employees').style.setProperty('display', (isDev) ? '' : 'none', 'important'); 
-    document.getElementById('nav-finance').style.setProperty('display', (isDev || isManager || isBranch) ? '' : 'none', 'important');
+    document.getElementById('nav-branches').style.setProperty('display', (isDev) ? 'none' : (isDev ? '' : 'none'), 'important');
+    document.getElementById('nav-employees').style.setProperty('display', (isDev) ? '' : 'none', 'important');
+    document.getElementById('nav-finance').style.setProperty('display', (isDev) ? 'none' : (isDev || isManager || isBranch ? '' : 'none'), 'important');
     const navDailyBudget = document.getElementById('nav-dailybudget');
-    if(navDailyBudget) navDailyBudget.style.setProperty('display', (isDev || isManager || isBranch) ? '' : 'none', 'important');
+    if (navDailyBudget) navDailyBudget.style.setProperty('display', (isDev) ? 'none' : (isDev || isBranch ? '' : 'none'), 'important');
+    const navTrainers = document.getElementById('nav-trainers');
+    if (navTrainers) navTrainers.style.setProperty('display', (isDev) ? 'none' : (isDev || isManager || isBranch ? '' : 'none'), 'important');
     document.getElementById('nav-admin').style.setProperty('display', (isDev) ? '' : 'none', 'important');
-    
-    // Branch selector in topbar — only for dev/manager
-    const branchSel = document.querySelector('.branch-selector');
-    if (branchSel) {
-        branchSel.style.display = (!isBranch) ? '' : 'none';
-        const sel = document.getElementById('branchSelect');
-        if (sel) sel.value = AppState.currentBranch || 'all';
+
+    // Branch selector in topbar — only for manager (Dev doesn't need to filter operational reports)
+    const branchSelArea = document.getElementById('topbarBranchSelector');
+    if (branchSelArea) {
+        branchSelArea.style.display = (isManager) ? '' : 'none';
+        if (isManager) {
+            branchSelArea.innerHTML = renderCustomBranchSelect('branchSelect', AppState.currentBranch || 'all', 'handleTopbarBranchChange');
+        }
     }
 }
 
@@ -745,10 +920,13 @@ function navigate(page) {
     const isBranch = AppState.userRole === 'branch';
 
     // Permission check
-    if (isBranch && ['branches','employees','admin'].includes(page)) {
+    if (isDev && page === 'dashboard') {
+        page = 'admin';
+    }
+    if (isBranch && ['branches', 'employees', 'admin'].includes(page)) {
         page = 'dashboard';
     }
-    if (isManager && ['branches','admin','report', 'employees'].includes(page)) {
+    if (isManager && ['branches', 'admin', 'report', 'employees', 'dailybudget'].includes(page)) {
         page = 'dashboard';
     }
     if (!isDev && page === 'admin') {
@@ -767,14 +945,15 @@ function navigate(page) {
         report: 'التقرير اليومي',
         branches: 'إدارة الفروع',
         employees: 'الموظفين',
+        trainers: 'المدربين',
         finance: 'المالية',
         dailybudget: 'الميزانية اليومية',
         admin: 'الأدمن إديتور',
     };
     document.getElementById('pageTitle').textContent = titles[page] || '';
 
-     AppState.currentPage = page;
-     localStorage.setItem('bms_page', page);
+    AppState.currentPage = page;
+    localStorage.setItem('bms_page', page);
 
     // Render selected page
     const container = document.getElementById('pageContent');
@@ -785,22 +964,23 @@ function navigate(page) {
 
     switch (page) {
         case 'dashboard': renderDashboard(container); break;
-        case 'report':    renderReport(container);    break;
-        case 'branches':  renderBranches(container);  break;
+        case 'report': renderReport(container); break;
+        case 'branches': renderBranches(container); break;
         case 'employees': renderEmployees(container); break;
-        case 'finance':   renderFinance(container);   break;
+        case 'trainers': renderTrainers(container); break;
+        case 'finance': renderFinance(container); break;
         case 'dailybudget': renderDailyBudget(container); break;
-        case 'admin':     renderAdmin(container);     break;
+        case 'admin': renderAdmin(container); break;
     }
 }
 
 // -------------------------
-window.handleTopbarBranchChange = function(val) {
+window.handleTopbarBranchChange = function (val) {
     AppState.currentBranch = val;
     if (AppState.userRole) navigate(AppState.currentPage);
 };
 
-window.handleFilterBranchChange = function(val) {
+window.handleFilterBranchChange = function (val) {
     // This is handled by selectCustomOption setting the data-value
 };
 
@@ -817,7 +997,7 @@ function renderCustomBranchSelect(id, initialVal, callbackName) {
         </div>
         <div class="custom-options" id="${id}-options">
             <div class="custom-option" onclick="selectCustomOption('${id}','all','جميع الفروع (تقرير مجمع)','#001f3f','${callbackName}')">جميع الفروع (تقرير مجمع)</div>
-            ${Object.entries(branchList).map(([k,v]) => `
+            ${getSortedBranchesEntries(branchList).map(([k, v]) => `
                 <div class="custom-option" onclick="selectCustomOption('${id}','${k}','${v.name}','#001f3f','${callbackName}')">${v.name}</div>
             `).join('')}
         </div>
@@ -904,14 +1084,14 @@ function renderDashboard(el) {
     }
     const netRevenue = totalRevenue - totalExpenses;
 
-    const branchEntries = Object.entries(BRANCHES).filter(([k]) => k === AppState.userBranch);
+    const branchEntries = getSortedBranchesEntries(BRANCHES).filter(([k]) => k === AppState.userBranch);
 
     const branchData = branchEntries.map(([key, branch]) => {
         const bReports = allReports.filter(r => r?.branch === key);
         const bRev = bReports.reduce((s, r) => s + getInc(r), 0);
         const bExp = bReports.reduce((s, r) => s + getExp(r), 0);
-        const bCalls = bReports.reduce((s,r) => s + (r?.morning?.calls||0) + (r?.evening?.calls||0), 0);
-        const bBookings = bReports.reduce((s,r) => s + (r?.morning?.bookings||0) + (r?.evening?.bookings||0), 0);
+        const bCalls = bReports.reduce((s, r) => s + (r?.morning?.calls || 0) + (r?.evening?.calls || 0), 0);
+        const bBookings = bReports.reduce((s, r) => s + (r?.morning?.bookings || 0) + (r?.evening?.bookings || 0), 0);
         const bStaff = EMPLOYEES.filter(e => e.branch === key);
         const bManager = bStaff.find(e => e.role === 'مديرة الفرع');
         const bSecretaries = bStaff.filter(e => e.role !== 'مديرة الفرع');
@@ -963,20 +1143,20 @@ function renderDashboard(el) {
     </div>
 
     <div class="official-summary-banner animate-in">
-        <div class="official-summary-item">
-            <div class="label">مجموع ايراد اليوم</div>
+        <div class="official-summary-item revenue">
+            <div class="label">إجمالي الإيرادات</div>
             <div class="value">${formatNumber(totalRevenue)}</div>
         </div>
-        <div class="official-summary-item">
-            <div class="label">مجموع منصرف</div>
+        <div class="official-summary-item expenses">
+            <div class="label">إجمالي المصروفات</div>
             <div class="value">${formatNumber(totalExpenses)}</div>
         </div>
-        <div class="official-summary-item">
-            <div class="label">صافي ايراد اليوم</div>
+        <div class="official-summary-item net">
+            <div class="label">صافي إيراد اليوم</div>
             <div class="value">${formatNumber(netRevenue)}</div>
         </div>
-        <div class="official-summary-item highlight">
-            <div class="label">الرصيد الحالي</div>
+        <div class="official-summary-item balance">
+            <div class="label">الرصيد الفعلي الحالي</div>
             <div class="value">${formatNumber(currentBalance)}</div>
         </div>
     </div>
@@ -987,7 +1167,7 @@ function renderDashboard(el) {
 
     <div class="branches-grid">
         ${branchData.map((bd, i) => `
-        <div class="official-dashboard-card animate-in" style="animation-delay:${i*0.07}s">
+        <div class="official-dashboard-card animate-in" style="animation-delay:${i * 0.07}s">
             <div class="official-card-header">
                 <div class="name">${bd.branch.name}</div>
                 <div class="loc">📍 ${bd.branch.city} ${bd.bManager ? '· مديرة: ' + bd.bManager.name : ''}</div>
@@ -1002,7 +1182,7 @@ function renderDashboard(el) {
                     <span class="official-stat-value">${formatNumber(bd.tExp || 0)} ج.م</span>
                 </div>
                 <div class="official-stat-row">
-                    <span class="official-stat-label">صافي إيراد اليوم</span>
+                    <span class="official-stat-label">صافي حركة اليوم</span>
                     <span class="official-stat-value" style="color:var(--primary) !important;">${formatNumber(bd.tRev - bd.tExp)} ج.م</span>
                 </div>
                 <div class="official-stat-row">
@@ -1040,7 +1220,7 @@ function renderDashboard(el) {
 // -------------------------
 function renderManagerDashboard(el) {
     const allReports = AppState.reports;
-    let branchEntries = Object.entries(BRANCHES);
+    let branchEntries = getSortedBranchesEntries(BRANCHES);
     if (AppState.currentBranch && AppState.currentBranch !== 'all') {
         branchEntries = branchEntries.filter(([key]) => key === AppState.currentBranch);
     }
@@ -1061,8 +1241,8 @@ function renderManagerDashboard(el) {
         return { key, branch, bReports, bRev, bExp, bCalls, bBookings, bStaff, bManager, bSecretaries, lastReport };
     });
 
-    const selectedBranchName = (AppState.currentBranch && AppState.currentBranch !== 'all') 
-        ? BRANCHES[AppState.currentBranch]?.name 
+    const selectedBranchName = (AppState.currentBranch && AppState.currentBranch !== 'all')
+        ? BRANCHES[AppState.currentBranch]?.name
         : 'جميع الفروع المستقلة';
 
     // --- Aggregate Manager Metrics for Today ---
@@ -1100,7 +1280,7 @@ function renderManagerDashboard(el) {
             <div class="value" style="color:#fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatNumber(totalManagerExp)}</div>
         </div>
         <div class="official-summary-item" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; border:none; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-            <div class="label" style="color:#fff; font-weight:800;">صافي ايراد اليوم</div>
+            <div class="label" style="color:#fff; font-weight:800;">صافي حركة اليوم</div>
             <div class="value" style="color:#fff; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatNumber(totalManagerNet)}</div>
         </div>
         <div class="official-summary-item highlight" style="background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: #fff; border:none; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
@@ -1115,7 +1295,7 @@ function renderManagerDashboard(el) {
     </div>
     <div class="branches-grid" style="margin-bottom:30px;">
         ${branchData.map((bd, i) => `
-        <div class="official-dashboard-card animate-in" style="animation-delay:${i*0.07}s; border:1px solid rgba(0,0,0,0.05); box-shadow:0 6px 15px rgba(0,0,0,0.05);">
+        <div class="official-dashboard-card animate-in" style="animation-delay:${i * 0.07}s; border:1px solid rgba(0,0,0,0.05); box-shadow:0 6px 15px rgba(0,0,0,0.05);">
             <div class="official-card-header" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border-bottom:none;">
                 <div class="name" style="color:#fff;">${bd.branch.name}</div>
                 <div class="loc" style="color:rgba(255,255,255,0.8);">📍 ${bd.branch.city} ${bd.bManager ? '· مديرة: ' + bd.bManager.name : ''}</div>
@@ -1167,7 +1347,7 @@ function renderManagerDashboard(el) {
     ${summaryBannerHTML}
     ${branchesGridHTML}
 
-    <div class="section-card animate-in">
+    <div class="section-card animate-in" style="z-index: 200; position: relative;">
         <div class="section-card-header">
             <div class="header-icon morning">🔍</div>
             <h3>تصفية التقارير التفصيلية</h3>
@@ -1197,7 +1377,7 @@ function renderManagerDashboard(el) {
     `;
 }
 
-window.resetManagerDate = function() {
+window.resetManagerDate = function () {
     const picker = document.getElementById('mDateFilter');
     if (picker) {
         picker.value = today();
@@ -1205,15 +1385,16 @@ window.resetManagerDate = function() {
     }
 };
 
-window.searchManagerReport = function() {
+window.searchManagerReport = function () {
     const date = document.getElementById('mDateFilter').value;
     const branchFilterTrigger = document.getElementById('mBranchFilter-trigger');
     const branchKey = branchFilterTrigger ? branchFilterTrigger.dataset.value : 'all';
     const res = document.getElementById('mReportResult');
 
-    const reports = (branchKey === 'all') 
+    // 1. Filter reports strictly
+    const reports = (branchKey === 'all')
         ? AppState.reports.filter(r => r.date === date)
-        : AppState.reports.filter(r => r?.branch === branchKey && r.date === date);
+        : AppState.reports.filter(r => (r?.branch === branchKey || normalizeArabic(r.branch) === branchKey) && r.date === date);
 
     if (reports.length === 0) {
         res.innerHTML = `
@@ -1224,46 +1405,45 @@ window.searchManagerReport = function() {
         return;
     }
 
-    if (branchKey === 'all') {
-        const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
-        const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
+    // 2. Calculate Totals (Unify logic)
+    const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
+    const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
 
-        const totalRev = reports.reduce((s, r) => s + getInc(r), 0);
-        const totalExp = reports.reduce((s, r) => s + getExp(r), 0);
-        const totalBucks = reports.reduce((s, r) => s + (r?.morning?.bookings || 0) + (r?.evening?.bookings || 0), 0);
+    const totalRev = reports.reduce((s, r) => s + getInc(r), 0);
+    const totalExp = reports.reduce((s, r) => s + getExp(r), 0);
+    const totalBucks = reports.reduce((s, r) => s + (r?.morning?.bookings || 0) + (r?.evening?.bookings || 0), 0);
 
-        res.innerHTML = `
-        <div class="summary-grid animate-in" style="margin-bottom:20px;">
-            <div class="summary-card red" style="padding:15px;">
-                <div class="card-label">إجمالي إيراد الفروع</div>
-                <div class="card-value" style="font-size:20px;">${formatNumber(totalRev)} <small>ج.م</small></div>
-            </div>
-            <div class="summary-card gold" style="padding:15px;">
-                <div class="card-label">إجمالي المصروفات</div>
-                <div class="card-value" style="font-size:20px;">${formatNumber(totalExp)} <small>ج.م</small></div>
-            </div>
-            <div class="summary-card green" style="padding:15px;">
-                <div class="card-label">صافي إجمالي اليوم</div>
-                <div class="card-value" style="font-size:20px;">${formatNumber(totalRev - totalExp)} <small>ج.م</small></div>
-            </div>
-            <div class="summary-card blue" style="padding:15px;">
-                <div class="card-label">إجمالي الحجوزات</div>
-                <div class="card-value" style="font-size:20px;">${totalBucks} <span style="font-size:12px;">حجز</span></div>
-            </div>
+    const branchLabel = (branchKey === 'all') ? 'إجمالي جميع الفروع' : `إجمالي ${BRANCHES[branchKey]?.name || 'الفرع'}`;
+
+    res.innerHTML = `
+    <div class="summary-grid animate-in" style="margin-bottom:20px;">
+        <div class="summary-card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: #fff; border:none; padding:15px;">
+            <div class="card-label" style="color:#fff; font-weight:800;">${branchLabel}</div>
+            <div class="card-value" style="font-size:22px; color:#fff;">${formatNumber(totalRev)} <small>ج.م</small></div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:40px; padding-bottom:50px;">
-            ${reports.map(report => renderOfficialTable(report)).join('')}
-        </div>`;
-    } else {
-        res.innerHTML = reports.map(report => renderOfficialTable(report)).join('');
-    }
+        <div class="summary-card" style="background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%); color: #fff; border:none; padding:15px;">
+            <div class="card-label" style="color:#fff; font-weight:800;">المصروفات</div>
+            <div class="card-value" style="font-size:22px; color:#fff;">${formatNumber(totalExp)} <small>ج.م</small></div>
+        </div>
+        <div class="summary-card" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; border:none; padding:15px;">
+            <div class="card-label" style="color:#fff; font-weight:800;">الصافي</div>
+            <div class="card-value" style="font-size:22px; color:#fff;">${formatNumber(totalRev - totalExp)} <small>ج.م</small></div>
+        </div>
+        <div class="summary-card" style="background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); color: #fff; border:none; padding:15px;">
+            <div class="card-label" style="color:#fff; font-weight:800;">الحجوزات</div>
+            <div class="card-value" style="font-size:22px; color:#fff;">${totalBucks} <span style="font-size:12px;">حجز</span></div>
+        </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:40px; padding-bottom:50px;">
+        ${reports.map(report => renderOfficialTable(report)).join('')}
+    </div>`;
 };
 
-window.renderOfficialTable = function(report) {
+window.renderOfficialTable = function (report) {
     const b = BRANCHES[report.branch] || { name: 'فرع مجهول', color: '#b20000', city: '—' };
     const morningSecs = report.morning?.secretaries || [];
     const eveningSecs = report.evening?.secretaries || [];
-    
+
     return `
     <div class="official-report-container animate-in" style="background:var(--bg-card); border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.08); overflow:hidden; border:1px solid rgba(0,0,0,0.05); margin-bottom: 25px;">
         <!-- HEADER -->
@@ -1318,18 +1498,18 @@ window.renderOfficialTable = function(report) {
 
         <!-- FINANCIAL SUMMARY -->
         <div class="official-table-grid" style="border:1px solid rgba(0,0,0,0.05);">
-            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border:none; color:#fff;">مجموع ايراد اليوم:</div>
+            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border:none; color:#fff;">مجموع إيراد اليوم:</div>
             <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%); border:none; border-right:1px solid rgba(0,0,0,0.05); color:#fff;">مجموع منصرف:</div>
-            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border:none; border-right:1px solid rgba(0,0,0,0.05); color:#fff;">صافي ايراد اليوم:</div>
+            <div class="official-header-red" style="grid-column: span 1; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border:none; border-right:1px solid rgba(0,0,0,0.05); color:#fff;">صافي حركة اليوم:</div>
             
             <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#11998e; border:none; border-top:1px solid rgba(0,0,0,0.05);">${formatNumber(report.financials?.dailyInflow || 0)}</div>
             <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#cb2d3e; border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">${formatNumber(report.financials?.dailyOutflow || 0)}</div>
-            <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#1e3c72; border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">${formatNumber(report.financials?.totalNet || 0)}</div>
+            <div class="official-cell" style="background:var(--bg-card); font-size:22px; color:#1e3c72; border:none; border-right:1px solid rgba(0,0,0,0.05); border-top:1px solid rgba(0,0,0,0.05);">${formatNumber((report.financials?.dailyInflow || 0) - (report.financials?.dailyOutflow || 0))}</div>
         </div>
 
         <!-- BALANCE BAR -->
         <div class="official-header-red" style="margin-top:2px; font-size:22px; background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); border:none; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,0.2);">
-            الحالي : ${formatNumber(report.currentBalance || 0)}
+            الرصيد الفعلي (شامل السابق) : ${formatNumber(report.currentBalance || 0)}
         </div>
 
         <!-- EXPENSE TABLE -->
@@ -1369,7 +1549,7 @@ window.renderOfficialTable = function(report) {
 // -------------------------
 
 
-window.updateManagerName = function() {
+window.updateManagerName = function () {
     AppState.managerName = document.getElementById('adminManagerName').value;
     saveData();
     showToast('تم تحديث اسم المدير بنجاح', 'success');
@@ -1407,18 +1587,18 @@ function renderReport(el, existingData = null) {
          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:20px; align-items:flex-end;">
             <div class="form-group">
                 <label>الفرع</label>
-                ${AppState.userRole === 'branch' 
-                    ? `<div style="padding:12px; background:var(--bg-input); border-radius:12px; font-weight:bold; color:var(--primary); font-size:16px;">${BRANCHES[AppState.userBranch]?.name}</div>
+                ${AppState.userRole === 'branch'
+            ? `<div style="padding:12px; background:var(--bg-input); border-radius:12px; font-weight:bold; color:var(--primary); font-size:16px;">${BRANCHES[AppState.userBranch]?.name}</div>
                        <input type="hidden" id="branchSelect2" value="${AppState.userBranch}">`
-                    : `<select id="branchSelect2" style="padding:12px; border-radius:12px;">
-                        ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}" ${k===(data.branch || AppState.userBranch || 'soyouf')?'selected':''}>${v.name}</option>`).join('')}
+            : `<select id="branchSelect2" onchange="reloadReportByDate()" style="padding:12px; border-radius:12px;">
+                        ${getSortedBranchesEntries(BRANCHES).map(([k, v]) => `<option value="${k}" ${k === (data.branch || AppState.userBranch || 'soyouf') ? 'selected' : ''}>${v.name}</option>`).join('')}
                        </select>`
-                }
+        }
             </div>
             <div class="form-group">
                 <label>التاريخ</label>
                 <div style="display:flex; gap:10px; align-items:center;">
-                    <input type="date" id="reportDate" value="${data.date || today()}" style="padding:12px; border-radius:12px; flex:1;">
+                    <input type="date" id="reportDate" onchange="reloadReportByDate()" value="${data.date || today()}" style="padding:12px; border-radius:12px; flex:1;">
                     <button class="official-btn" onclick="reloadReportByDate()" title="مزامنة بيانات التاريخ المحدد" style="padding:12px; width:45px; height:45px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:var(--primary); color:#fff; border:none; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
                         🔄
                     </button>
@@ -1585,7 +1765,7 @@ function renderReport(el, existingData = null) {
             </div>
         </div>
         <div class="net-balance-container" style="background:rgba(255,255,255,0.05);">
-            <div class="net-balance-label" style="opacity:0.8; font-size:14px;">📊 الصافي النهائي لليوم (شامل الرصيد السابق)</div>
+            <div class="net-balance-label" style="color:#ffffff !important; font-weight:950; font-size:16px; margin-bottom:10px;">📊 الصافي النهائي لليوم (شامل الرصيد السابق)</div>
             <div class="net-balance-highlight" id="totalDailyNetDisplay" style="text-shadow:0 0 20px rgba(0,229,255,0.5);">
                 ${formatNumber(financials.totalNet || 0)}
             </div>
@@ -1603,10 +1783,10 @@ function renderReport(el, existingData = null) {
         </button>
     </div>
     `;
-    
+
     // Initial population
     const currentBKey = (AppState.userRole === 'branch') ? AppState.userBranch : document.getElementById('branchSelect2').value;
-    
+
     // Set saved value for reporter dropdown first
     const reporterSelect = document.getElementById('reportedBy');
     if (reporterSelect) reporterSelect.dataset.savedVal = data.reportedBy || "";
@@ -1624,13 +1804,13 @@ function renderReport(el, existingData = null) {
         // New per-shift format
         if (morningInflows.length) morningInflows.forEach(item => addInflowRow('morningInflowRows', item));
         else addInflowRow('morningInflowRows');
-        
+
         if (eveningInflows.length) eveningInflows.forEach(item => addInflowRow('eveningInflowRows', item));
         else addInflowRow('eveningInflowRows');
-        
+
         if (morningOutflows.length) morningOutflows.forEach(item => addOutflowRow('morningOutflowRows', item));
         else addOutflowRow('morningOutflowRows');
-        
+
         if (eveningOutflows.length) eveningOutflows.forEach(item => addOutflowRow('eveningOutflowRows', item));
         else addOutflowRow('eveningOutflowRows');
     } else if (financials.inflowList && financials.inflowList.length > 0) {
@@ -1677,19 +1857,26 @@ function renderReport(el, existingData = null) {
     }
 }
 
-window.updateSecretaryLists = function(branchKey, morningData = [], eveningData = []) {
+window.updateSecretaryLists = function (branchKey, morningData = [], eveningData = []) {
     const morningContainer = document.getElementById('morningSecretaryChecklist');
     const eveningContainer = document.getElementById('eveningSecretaryChecklist');
     if (!morningContainer || !eveningContainer) return;
 
     const branchStaff = EMPLOYEES.filter(e => e.branch === branchKey);
-    
+
     const renderList = (shift) => {
         const defStart = (shift === 'morning') ? document.getElementById('morningOpenTime').value : document.getElementById('eveningOpenTime').value;
         const defEnd = (shift === 'morning') ? document.getElementById('morningCloseTime').value : document.getElementById('eveningCloseTime').value;
-        
-        return branchStaff.map(emp => `
-            <div class="presence-card animate-in" onclick="togglePresence(this, '${shift}')">
+
+        return branchStaff.map(emp => {
+            const savedData = (shift === 'morning') ? morningData : eveningData;
+            const savedEmp = savedData.find(s => s.name === emp.name);
+            const active = !!savedEmp;
+            const start = savedEmp?.start || defStart;
+            const end = savedEmp?.end || defEnd;
+
+            return `
+            <div class="presence-card animate-in ${active ? 'active' : ''}" onclick="togglePresence(this, '${shift}')">
                 <div class="check-icon">✓</div>
                 <div class="avatar-circle">${emp.name[0]}</div>
                 <div class="emp-name">${emp.name}</div>
@@ -1698,16 +1885,17 @@ window.updateSecretaryLists = function(branchKey, morningData = [], eveningData 
                 <div class="card-times" onclick="event.stopPropagation()">
                     <div class="time-input-group">
                         <label>الحضور</label>
-                        <input type="time" class="time-in" value="${defStart}">
+                        <input type="time" class="time-in" value="${start}">
                     </div>
                     <div class="time-input-group">
                         <label>الانصراف</label>
-                        <input type="time" class="time-out" value="${defEnd}">
+                        <input type="time" class="time-out" value="${end}">
                     </div>
                 </div>
-                <input type="checkbox" style="display:none;" data-name="${emp.name}">
+                <input type="checkbox" ${active ? 'checked' : ''} style="display:none;" data-name="${emp.name}">
             </div>
-        `).join('') || '<p style="color:var(--text-secondary); padding:10px;">لا يوجد موظفين مسجلين هذا الفرع</p>';
+            `;
+        }).join('') || '<p style="color:var(--text-secondary); padding:10px;">لا يوجد موظفين مسجلين هذا الفرع</p>';
     };
 
     morningContainer.innerHTML = renderList('morning');
@@ -1716,17 +1904,17 @@ window.updateSecretaryLists = function(branchKey, morningData = [], eveningData 
     // Update 'Reported By' dropdown
     const reportedBySelect = document.getElementById('reportedBy');
     if (reportedBySelect) {
-        const currentVal = reportedBySelect.dataset.savedVal || ""; 
-        reportedBySelect.innerHTML = '<option value="">اختر الاسم...</option>' + 
+        const currentVal = reportedBySelect.dataset.savedVal || "";
+        reportedBySelect.innerHTML = '<option value="">اختر الاسم...</option>' +
             branchStaff.map(emp => `<option value="${emp.name}" ${emp.name === currentVal ? 'selected' : ''}>${emp.name}</option>`).join('');
     }
 };
 
-window.togglePresence = function(el, shift) {
+window.togglePresence = function (el, shift) {
     el.classList.toggle('active');
     const cb = el.querySelector('input[type="checkbox"]');
     if (cb) cb.checked = el.classList.contains('active');
-    
+
     // Auto-sync times from shift defaults if becoming active
     if (el.classList.contains('active')) {
         const shiftIn = document.getElementById(`${shift}OpenTime`)?.value;
@@ -1737,17 +1925,17 @@ window.togglePresence = function(el, shift) {
 };
 
 
-window.addInflowRow = function(containerId = 'morningInflowRows', item = {}) {
+window.addInflowRow = function (containerId = 'morningInflowRows', item = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const row = document.createElement('div');
-    row.className = 'ledger-row-premium animate-in';
+    row.className = 'short-row-premium animate-in';
     row.innerHTML = `
         <div class="capsule-input capsule-wide">
             <input type="text" placeholder="بيان الدخول (الوارد)..." value="${item.statement || ''}" oninput="calculateGlobalBalance()">
         </div>
         <div class="capsule-input capsule-small inflow-accent">
-            <input type="text" inputmode="decimal" placeholder="المبلغ" value="${item.amount || ''}" 
+            <input type="text" inputmode="decimal" placeholder="0" value="${item.amount || ''}" 
                    oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); calculateGlobalBalance()">
         </div>
         <button class="btn-remove" style="width:35px; height:35px; flex-shrink:0; border-radius:50%;" onclick="this.closest('.ledger-row-premium').remove(); calculateGlobalBalance();">✕</button>
@@ -1756,17 +1944,17 @@ window.addInflowRow = function(containerId = 'morningInflowRows', item = {}) {
     calculateGlobalBalance();
 };
 
-window.addOutflowRow = function(containerId = 'morningOutflowRows', item = {}) {
+window.addOutflowRow = function (containerId = 'morningOutflowRows', item = {}) {
     const container = document.getElementById(containerId);
     if (!container) return;
     const row = document.createElement('div');
-    row.className = 'ledger-row-premium animate-in';
+    row.className = 'short-row-premium animate-in';
     row.innerHTML = `
         <div class="capsule-input capsule-wide">
             <input type="text" placeholder="بيان الخروج (المنصرف)..." value="${item.statement || ''}" oninput="calculateGlobalBalance()">
         </div>
         <div class="capsule-input capsule-small outflow-accent">
-            <input type="text" inputmode="decimal" placeholder="المبلغ" value="${item.amount || ''}" 
+            <input type="text" inputmode="decimal" placeholder="0" value="${item.amount || ''}" 
                    oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); calculateGlobalBalance()">
         </div>
         <button class="btn-remove" style="width:35px; height:35px; flex-shrink:0; border-radius:50%;" onclick="this.closest('.ledger-row-premium').remove(); calculateGlobalBalance();">✕</button>
@@ -1777,34 +1965,34 @@ window.addOutflowRow = function(containerId = 'morningOutflowRows', item = {}) {
 
 
 
-window.calculateGlobalBalance = function() {
+window.calculateGlobalBalance = function () {
     const getListSum = (selector) => {
         return [...document.querySelectorAll(selector)].reduce((sum, row) => {
-            const input = row.querySelector('input[placeholder="المبلغ"]');
-            const val = parseFloat(input?.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0;
+            const input = row.querySelector('input[placeholder="0"]');
+            const val = parseFloat(input?.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g, '')) || 0;
             return sum + val;
         }, 0);
     };
-    
-    const inflowTotal = getListSum('.inflow-list .ledger-row-premium');
-    const outflowTotal = getListSum('.outflow-list .ledger-row-premium');
-    const prevBalance = parseFloat(document.getElementById('previousBalance')?.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0;
-    
+
+    const inflowTotal = getListSum('.inflow-list .ledger-row-premium, .inflow-list .short-row-premium');
+    const outflowTotal = getListSum('.outflow-list .ledger-row-premium, .outflow-list .short-row-premium');
+    const prevBalance = parseFloat(document.getElementById('previousBalance')?.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g, '')) || 0;
+
     const netTotal = prevBalance + inflowTotal - outflowTotal;
-    
+
     // Update data inputs
     const inEl = document.getElementById('dailyInflow');
     const outEl = document.getElementById('dailyOutflow');
     const netEl = document.getElementById('totalDailyNet');
-    
+
     if (inEl) inEl.value = inflowTotal;
     if (outEl) outEl.value = outflowTotal;
     if (netEl) netEl.value = netTotal;
-    
+
     // Update decorative highlights
     const netDisplay = document.getElementById('totalDailyNetDisplay');
     if (netDisplay) netDisplay.innerText = formatNumber(netTotal);
-    
+
     const curBalEl = document.getElementById('currentBalance');
     if (curBalEl) {
         curBalEl.value = netTotal;
@@ -1818,8 +2006,8 @@ window.calculateGlobalBalance = function() {
         if (AppState.ledgers[ledgerKey]) {
             AppState.ledgers[ledgerKey].previousBalance = prevBalance;
         } else {
-             // Create ledger if it doesn't exist to maintain sync
-             AppState.ledgers[ledgerKey] = {
+            // Create ledger if it doesn't exist to maintain sync
+            AppState.ledgers[ledgerKey] = {
                 previousBalance: prevBalance,
                 rows: [{ bookingType: 'رصيد مرحل من التقرير', value: 0, receiptNo: '', clientName: '', expense: 0, type: '', notes: '' }]
             };
@@ -1829,15 +2017,15 @@ window.calculateGlobalBalance = function() {
 
 
 // Auto-fetch the last report's closing balance for this branch
-window.fetchLastBalance = function(branchKey) {
+window.fetchLastBalance = function (branchKey) {
     const todayDate = today();
-    
+
     // 1. Check past ledgers first (as it's the daily record)
     const ledgerDates = Object.keys(AppState.ledgers)
         .filter(k => k.startsWith(branchKey + '_'))
         .map(k => k.split('_')[1])
         .filter(d => d < todayDate)
-        .sort((a,b) => b.localeCompare(a));
+        .sort((a, b) => b.localeCompare(a));
 
     if (ledgerDates.length > 0) {
         const lastDate = ledgerDates[0];
@@ -1857,11 +2045,11 @@ window.fetchLastBalance = function(branchKey) {
     const pastReports = AppState.reports
         .filter(r => r.branch === branchKey && r.date !== todayDate)
         .sort((a, b) => b.date.localeCompare(a.date));
-    
+
     if (pastReports.length > 0) {
         const lastReport = pastReports[0];
         const lastBalance = lastReport.currentBalance || lastReport.financials?.totalNet || 0;
-        
+
         if (lastBalance > 0) {
             const prevInput = document.getElementById('previousBalance');
             if (prevInput && !prevInput.value) {
@@ -1874,20 +2062,20 @@ window.fetchLastBalance = function(branchKey) {
 };
 
 // Sync Previous Balance manually to specific active date
-window.syncPreviousBalance = function() {
+window.syncPreviousBalance = function () {
     const branchSelect = document.getElementById('branchSelect2');
     const branchKey = branchSelect ? branchSelect.value : (AppState.userBranch || AppState.currentBranch || 'soyouf');
     const activeDate = document.getElementById('reportDate')?.value || today();
-    
+
     // Check past reports for this specific date chronologically
     const pastReports = AppState.reports
         .filter(r => r.branch === branchKey && r.date < activeDate)
         .sort((a, b) => b.date.localeCompare(a.date));
-    
+
     if (pastReports.length > 0) {
         const lastReport = pastReports[0];
         const lastBalance = lastReport.currentBalance || lastReport.financials?.totalNet || 0;
-        
+
         const prevInput = document.getElementById('previousBalance');
         if (prevInput) {
             prevInput.value = lastBalance;
@@ -1900,20 +2088,20 @@ window.syncPreviousBalance = function() {
 };
 
 // Reload report when date or branch is changed manually and "Refresh" is clicked
-window.reloadReportByDate = function(resetToToday = false) {
+window.reloadReportByDate = function (resetToToday = false) {
     const dateInput = document.getElementById('reportDate');
     const branchInput = document.getElementById('branchSelect2');
-    
+
     if (resetToToday) {
         dateInput.value = today();
     }
-    
+
     const selectedDate = dateInput.value;
     const selectedBranch = branchInput.value;
-    
+
     // Find if a report exists for this combo
     const existing = AppState.reports.find(r => r.branch === selectedBranch && r.date === selectedDate);
-    
+
     const container = document.getElementById('pageContent');
     if (container) {
         renderReport(container, existing || { branch: selectedBranch, date: selectedDate });
@@ -1921,7 +2109,15 @@ window.reloadReportByDate = function(resetToToday = false) {
     }
 };
 
-window.saveReport = function() {
+window.saveReport = function () {
+    // 1. Validation: At least one secretary must be selected
+    const morningSects = [...document.querySelectorAll('#morningSecretaryChecklist .presence-card.active')];
+    const eveningSects = [...document.querySelectorAll('#eveningSecretaryChecklist .presence-card.active')];
+
+    if (morningSects.length === 0 && eveningSects.length === 0) {
+        showToast('⚠️ لا يمكن الحفظ: يجب اختيار سكرتيرة واحدة على الأقل!', 'error');
+        return;
+    }
     const morningSecretaryRows = [...document.querySelectorAll('#morningSecretaryChecklist .presence-card.active')].map(item => {
         const name = item.querySelector('input[type="checkbox"]').getAttribute('data-name');
         const times = item.querySelectorAll('input[type="time"]');
@@ -1934,11 +2130,11 @@ window.saveReport = function() {
         return { name, start: times[0].value, end: times[1].value };
     });
 
-    const collectList = (containerId, type) => {
-        return [...document.querySelectorAll(`#${containerId} .transaction-row`)].map(row => {
+    const collectList = (containerId) => {
+        return [...document.querySelectorAll(`#${containerId} .ledger-row-premium, #${containerId} .short-row-premium`)].map(row => {
             const stmt = row.querySelector('input[placeholder*="بيان"]')?.value || '';
-            const amtInput = row.querySelector('input[placeholder="المبلغ"]');
-            const amount = parseFloat(amtInput?.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0;
+            const amtInput = row.querySelector('input[placeholder="0"]');
+            const amount = parseFloat(amtInput?.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g, '')) || 0;
             return { statement: stmt, amount };
         }).filter(i => i.statement || i.amount);
     };
@@ -1981,7 +2177,7 @@ window.saveReport = function() {
             reportedBy: reportedBy
         },
         financials: {
-            previousBalance: parseFloat(document.getElementById('previousBalance').value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0,
+            previousBalance: parseFloat(document.getElementById('previousBalance').value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g, '')) || 0,
             dailyInflow: parseFloat(document.getElementById('dailyInflow').value) || 0,
             dailyOutflow: parseFloat(document.getElementById('dailyOutflow').value) || 0,
             totalNet: parseFloat(document.getElementById('totalDailyNet').value) || 0,
@@ -1995,7 +2191,7 @@ window.saveReport = function() {
         expenses: [],
         teacherBookings: document.getElementById('teacherBookings').value,
         cancellations: document.getElementById('cancellations').value,
-        currentBalance: parseFloat(document.getElementById('currentBalance').value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,'')) || 0,
+        currentBalance: parseFloat(document.getElementById('currentBalance').value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g, '')) || 0,
     };
 
     if (existingIndex >= 0) {
@@ -2003,7 +2199,10 @@ window.saveReport = function() {
     } else {
         AppState.reports.push(report);
     }
-    
+
+    // Safety check: ensure no duplicates were accidentally created
+    AppState.reports = deduplicateReports(AppState.reports);
+
     saveReportEntry(report);
     showToast('تم حفظ التقرير بنجاح!', 'success');
     setTimeout(() => navigate('dashboard'), 1000);
@@ -2014,10 +2213,10 @@ function saveReportEntry(reportObject) {
     // Determine the index to sync
     const index = AppState.reports.findIndex(r => r.id === reportObject.id);
     if (index === -1) return;
-    
+
     // Update local storage
     localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
-    
+
     // Atomic Cloud Update
     if (window.db && AppState.isInitialSyncComplete) {
         // Send ONLY this specific report to its array index in Firebase to prevent overwriting others
@@ -2040,13 +2239,13 @@ function renderBranches(el) {
     </div>
     <div class="branches-grid">
         ${Object.entries(BRANCHES).map(([key, branch], i) => {
-            const bReports = AppState.reports.filter(r => r?.branch === key);
-            const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
-            const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
-            const bRev = bReports.reduce((s, r) => s + getInc(r), 0);
-            const bExp = bReports.reduce((s, r) => s + getExp(r), 0);
-            return `
-            <div class="branch-card animate-in" style="animation-delay:${i*0.08}s">
+        const bReports = AppState.reports.filter(r => r?.branch === key);
+        const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
+        const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
+        const bRev = bReports.reduce((s, r) => s + getInc(r), 0);
+        const bExp = bReports.reduce((s, r) => s + getExp(r), 0);
+        return `
+            <div class="branch-card animate-in" style="animation-delay:${i * 0.08}s">
                 <div class="branch-card-top" style="background: linear-gradient(135deg, ${branch.color} 0%, ${branch.color}cc 100%);">
                     <div class="branch-name">${branch.name}</div>
                     <div class="branch-location">📍 ${branch.city}</div>
@@ -2062,7 +2261,7 @@ function renderBranches(el) {
                     </div>
                     <div class="branch-stat-row">
                         <span class="bsr-label">صافي الإيراد</span>
-                        <span class="bsr-val" style="color:var(--primary)">${formatNumber(bRev-bExp)} ج.م</span>
+                        <span class="bsr-val" style="color:var(--primary)">${formatNumber(bRev - bExp)} ج.م</span>
                     </div>
                     <div class="branch-stat-row">
                         <span class="bsr-label">عدد التقارير</span>
@@ -2070,14 +2269,14 @@ function renderBranches(el) {
                     </div>
                     <div class="branch-stat-row">
                         <span class="bsr-label">الموظفين</span>
-                        <span class="bsr-val">${EMPLOYEES.filter(e=>e.branch===key).length} موظف</span>
+                        <span class="bsr-val">${EMPLOYEES.filter(e => e.branch === key).length} موظف</span>
                     </div>
                 </div>
                 <div class="branch-card-footer">
                     <button class="btn btn-outline" style="flex:1;font-size:13px;padding:8px 12px;" onclick="navigate('report')">📝 تقرير جديد</button>
                 </div>
             </div>`;
-        }).join('')}
+    }).join('')}
     </div>
     `;
 }
@@ -2088,7 +2287,7 @@ function renderBranches(el) {
 function renderEmployees(el) {
     const isBranch = AppState.userRole === 'branch';
     let employees = EMPLOYEES;
-    
+
     if (isBranch) {
         employees = EMPLOYEES.filter(e => e.branch === AppState.userBranch);
     } else if (AppState.currentBranch && AppState.currentBranch !== 'all') {
@@ -2118,12 +2317,12 @@ function renderEmployees(el) {
                 </thead>
                 <tbody>
                     ${employees.map((emp, i) => {
-                        const isManager = AppState.userRole === 'manager';
-                        const displayName = isManager ? `موظف #${emp.id.slice(-3)}` : emp.name;
-                        const displayInitial = isManager ? '👤' : emp.name[0];
-                        
-                        return `
-                    <tr style="animation:fadeIn 0.3s ease ${i*0.05}s both;">
+        const isManager = AppState.userRole === 'manager';
+        const displayName = isManager ? `موظف #${emp.id.slice(-3)}` : emp.name;
+        const displayInitial = isManager ? '👤' : emp.name[0];
+
+        return `
+                    <tr style="animation:fadeIn 0.3s ease ${i * 0.05}s both;">
                         <td>
                             <div class="employee-card">
                                 <div class="emp-avatar">${displayInitial}</div>
@@ -2137,7 +2336,7 @@ function renderEmployees(el) {
                         <td><span class="badge ${emp.role === 'مديرة الفرع' ? 'badge-manager' : (emp.role === 'سكرتيرة' ? 'badge-secretary' : 'badge-morning')}">${emp.role}</span></td>
                         <td>${BRANCHES[emp.branch]?.name || emp.branch}</td>
                     </tr>`;
-                    }).join('')}
+    }).join('')}
                 </tbody>
             </table>
         </div>
@@ -2151,13 +2350,13 @@ function renderEmployees(el) {
 function renderFinance(el) {
     const isBranch = AppState.userRole === 'branch';
     let reports = AppState.reports || [];
-    
+
     if (isBranch) {
         reports = reports.filter(r => r.branch === AppState.userBranch);
     } else if (AppState.currentBranch && AppState.currentBranch !== 'all') {
         reports = reports.filter(r => r.branch === AppState.currentBranch);
     }
-    
+
     // Aggregation using the current financials structure
     const totalRevenue = reports.reduce((s, r) => s + (r.financials?.dailyInflow || 0), 0);
     const totalExpenses = reports.reduce((s, r) => s + (r.financials?.dailyOutflow || 0), 0);
@@ -2165,31 +2364,26 @@ function renderFinance(el) {
     const latestBalance = reports.length ? (reports[reports.length - 1].currentBalance || 0) : 0;
 
     el.innerHTML = `
-    <div class="page-header animate-in">
-        <h1>💰 المالية</h1>
-        <p>${isBranch ? 'ملخص مالي لفرعك' : 'ملخص مالي تفصيلي لجميع الفروع'}</p>
-    </div>
-
-    <div class="financial-summary animate-in">
-        <div class="fin-stat">
-            <div class="fin-stat-label">إجمالي الإيرادات</div>
-            <div class="fin-stat-value" data-count="${totalRevenue}">0</div>
-            <div class="fin-stat-unit">جنيه مصري</div>
+    <div class="summary-grid animate-in" style="margin-bottom: 25px; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+        <div class="summary-card green" style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: white; border: none; padding: 15px 12px; min-height: unset; gap: 5px;">
+            <div class="card-label" style="color: rgba(255,255,255,0.9); font-weight: 700; font-size: 12px; margin-bottom: 0;">إجمالي الإيرادات</div>
+            <div class="card-value" data-count="${totalRevenue}" style="color: white; font-size: 24px; line-height: 1;">0</div>
+            <div class="card-unit" style="color: rgba(255,255,255,0.8); font-size: 11px;">جنيه مصري</div>
         </div>
-        <div class="fin-stat">
-            <div class="fin-stat-label">إجمالي المصروفات</div>
-            <div class="fin-stat-value" data-count="${totalExpenses}">0</div>
-            <div class="fin-stat-unit">جنيه مصري</div>
+        <div class="summary-card red" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; border: none; padding: 15px 12px; min-height: unset; gap: 5px;">
+            <div class="card-label" style="color: rgba(255,255,255,0.9); font-weight: 700; font-size: 12px; margin-bottom: 0;">إجمالي المصروفات</div>
+            <div class="card-value" data-count="${totalExpenses}" style="color: white; font-size: 24px; line-height: 1;">0</div>
+            <div class="card-unit" style="color: rgba(255,255,255,0.8); font-size: 11px;">جنيه مصري</div>
         </div>
-        <div class="fin-stat">
-            <div class="fin-stat-label">صافي الإيراد</div>
-            <div class="fin-stat-value" data-count="${netRevenue}">0</div>
-            <div class="fin-stat-unit">جنيه مصري</div>
+        <div class="summary-card blue" style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; border: none; padding: 15px 12px; min-height: unset; gap: 5px;">
+            <div class="card-label" style="color: rgba(255,255,255,0.9); font-weight: 700; font-size: 12px; margin-bottom: 0;">صافي الإيراد</div>
+            <div class="card-value" data-count="${netRevenue}" style="color: white; font-size: 24px; line-height: 1;">0</div>
+            <div class="card-unit" style="color: rgba(255,255,255,0.8); font-size: 11px;">جنيه مصري</div>
         </div>
-        <div class="fin-stat">
-            <div class="fin-stat-label">الرصيد الحالي</div>
-            <div class="fin-stat-value" data-count="${latestBalance}">0</div>
-            <div class="fin-stat-unit">جنيه مصري</div>
+        <div class="summary-card gold" style="background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%); color: white; border: none; padding: 15px 12px; min-height: unset; gap: 5px;">
+            <div class="card-label" style="color: rgba(255,255,255,0.9); font-weight: 700; font-size: 12px; margin-bottom: 0;">الرصيد الحالي</div>
+            <div class="card-value" data-count="${latestBalance}" style="color: white; font-size: 24px; line-height: 1;">0</div>
+            <div class="card-unit" style="color: rgba(255,255,255,0.8); font-size: 11px;">جنيه مصري</div>
         </div>
     </div>
 
@@ -2205,25 +2399,25 @@ function renderFinance(el) {
                 </thead>
                 <tbody>
                     ${(() => {
-                        const allExpenses = reports.flatMap(r => {
-                            const mOut = r.financials?.morningOutflowList || [];
-                            const eBookOut = r.financials?.eveningOutflowList || [];
-                            // Backwards compatibility for legacy reports
-                            const legacyOut = r.expenses || [];
-                            
-                            return [...mOut, ...eBookOut, ...legacyOut].map(e => ({
-                                date: r.date,
-                                branch: r.branch,
-                                statement: e.statement || e.beneficiary || 'منصرف',
-                                amount: e.amount || 0
-                            }));
-                        });
+            const allExpenses = reports.flatMap(r => {
+                const mOut = r.financials?.morningOutflowList || [];
+                const eBookOut = r.financials?.eveningOutflowList || [];
+                // Backwards compatibility for legacy reports
+                const legacyOut = r.expenses || [];
 
-                        if (allExpenses.length === 0) {
-                            return `<tr><td colspan="4"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد مصروفات مسجلة</p></div></td></tr>`;
-                        }
+                return [...mOut, ...eBookOut, ...legacyOut].map(e => ({
+                    date: r.date,
+                    branch: r.branch,
+                    statement: e.statement || e.beneficiary || 'منصرف',
+                    amount: e.amount || 0
+                }));
+            });
 
-                        return allExpenses.map(e => `
+            if (allExpenses.length === 0) {
+                return `<tr><td colspan="4"><div class="empty-state"><span class="empty-icon">📭</span><p>لا توجد مصروفات مسجلة</p></div></td></tr>`;
+            }
+
+            return allExpenses.map(e => `
                             <tr>
                                 <td>${e.date}</td>
                                 <td>${BRANCHES[e.branch]?.name || e.branch}</td>
@@ -2231,7 +2425,7 @@ function renderFinance(el) {
                                 <td class="amount-cell expense">${formatNumber(e.amount)} ج.م</td>
                             </tr>
                         `).join('');
-                    })()}
+        })()}
                 </tbody>
             </table>
         </div>
@@ -2273,28 +2467,28 @@ function renderFinance(el) {
     });
 }
 
-window.editReport = function(id) {
+window.editReport = function (id) {
     const report = AppState.reports.find(r => r.id === id);
     if (!report) return;
-    
+
     AppState.currentBranch = report.branch;
     navigate('report');
-    
+
     setTimeout(() => {
         const dateInput = document.getElementById('reportDate');
         const branchInput = document.getElementById('branchSelect2');
         if (dateInput) dateInput.value = report.date;
         if (branchInput) branchInput.value = report.branch;
-        
+
         if (window.reloadReportByDate) {
             window.reloadReportByDate();
         }
     }, 50);
 };
 
-window.deleteReport = function(id) {
+window.deleteReport = function (id) {
     if (!confirm('⚠️ تحذير: هل أنت متأكد من حذف هذا التقرير نهائياً؟')) return;
-    
+
     AppState.reports = AppState.reports.filter(r => r.id !== id);
     saveData();
     showToast('تم حذف التقرير بنجاح', 'error');
@@ -2307,7 +2501,7 @@ window.deleteReport = function(id) {
 function renderDailyBudget(el) {
     const isBranch = AppState.userRole === 'branch';
     let budgets = AppState.budgets || [];
-    
+
     if (isBranch) {
         budgets = budgets.filter(b => b.branch === AppState.userBranch);
     } else if (AppState.currentBranch && AppState.currentBranch !== 'all') {
@@ -2347,7 +2541,7 @@ function renderDailyBudget(el) {
                 <div class="form-group">
                     <label>الفرع</label>
                     <select id="budgetBranch">
-                        ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('')}
+                        ${Object.entries(BRANCHES).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}
                     </select>
                 </div>` : ''}
             </div>
@@ -2375,8 +2569,8 @@ function renderDailyBudget(el) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${budgets.length === 0 ? `<tr><td colspan="8"><div class="empty-state"><p>لا توجد ميزانيات مسجلة</p></div></td></tr>` : 
-                    budgets.map(b => `
+                    ${budgets.length === 0 ? `<tr><td colspan="8"><div class="empty-state"><p>لا توجد ميزانيات مسجلة</p></div></td></tr>` :
+            budgets.map(b => `
                     <tr>
                         <td>${b.date}</td>
                         <td><strong>${b.studentName}</strong></td>
@@ -2398,7 +2592,7 @@ function renderDailyBudget(el) {
     `;
 }
 
-window.addStudentBudget = function() {
+window.addStudentBudget = function () {
     const studentName = document.getElementById('budgetStudentName').value.trim();
     const course = document.getElementById('budgetCourse').value.trim();
     const total = parseFloat(document.getElementById('budgetTotal').value) || 0;
@@ -2426,10 +2620,10 @@ window.addStudentBudget = function() {
     navigate('dailybudget');
 };
 
-window.addPaymentPrompt = function(id) {
+window.addPaymentPrompt = function (id) {
     const budget = AppState.budgets.find(b => b.id === id);
     if (!budget) return;
-    
+
     window.customPrompt(`إضافة دفعة للطالب ${budget.studentName} (المتبقي: ${budget.total - budget.paid})`, '0', (val) => {
         const payment = parseFloat(val);
         if (payment && payment > 0) {
@@ -2441,7 +2635,7 @@ window.addPaymentPrompt = function(id) {
     });
 };
 
-window.deleteBudget = function(id) {
+window.deleteBudget = function (id) {
     if (!confirm('هل أنت متأكد من حذف هذه الميزانية؟')) return;
     AppState.budgets = AppState.budgets.filter(b => b.id !== id);
     saveData();
@@ -2470,14 +2664,6 @@ function renderAdmin(el) {
                     <button class="btn btn-primary" onclick="adminSaveManagerName()">حفظ الاسم</button>
                 </div>
                 <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">هذا الاسم سيظهر في واجهة المدير العام وعند تسجيل الخروج.</p>
-            </div>
-            <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
-                <label>المفتاح السري (الماستر)</label>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="adminMasterPass" class="form-input" value="${AppState.masterPassword}" style="flex:1;">
-                    <button class="btn btn-primary" onclick="adminSaveMasterPass()">حفظ المفتاح</button>
-                </div>
-                <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">هذا المفتاح يتيح اختراق أي فرع والدخول كمبرمج وكشف الباسووردات.</p>
             </div>
             <div class="form-group" style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
                 <label>مسار حفظ النسخ الاحتياطية الإجباري للفروع</label>
@@ -2510,6 +2696,34 @@ function renderAdmin(el) {
                            oninput="changeAppColor(this.value)" style="width:100%; max-width:300px; height:45px; border:none; cursor:pointer; border-radius:8px;">
                     <button class="btn btn-secondary" onclick="resetAppColor()" style="padding:6px 12px; font-size:12px;">إرجاع للوضع الأصلي</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== PASSWORDS SECTION ====== -->
+    <div class="form-section animate-in" style="border-color:#f1c40f;">
+        <div class="form-section-header" style="background:#fef9e7;color:#f39c12;">🔑 إدارة كلمات المرور</div>
+        <div class="form-section-body">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>المفتاح السري (الماستر)</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="adminMasterPass" class="form-input" value="${AppState.masterPassword}" placeholder="admin#135">
+                        <button class="btn btn-primary" onclick="adminSaveMasterPass()">حفظ</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>كلمة مرور الإدارة (المدير)</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="adminManagerPass" class="form-input" value="${AppState.managerPassword || 'admin_2026'}" placeholder="admin_2026">
+                        <button class="btn btn-primary" onclick="adminSaveManagerPass()">حفظ</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="border-top:1px solid var(--border-color);margin-top:20px;padding-top:20px;">
+                <h4 style="margin-bottom:14px;font-size:15px;color:var(--text-primary);">📍 كلمات مرور الفروع</h4>
+                <div id="adminPasswordList"></div>
             </div>
         </div>
     </div>
@@ -2568,11 +2782,47 @@ function renderAdmin(el) {
                     <div class="form-group">
                         <label>الفرع</label>
                         <select id="newEmpBranch">
-                            ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}">${v.name}</option>`).join('')}
+                            ${getSortedBranchesEntries(BRANCHES).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}
                         </select>
                     </div>
                 </div>
                 <button class="btn btn-primary" style="margin-top:14px;" onclick="adminAddEmployee()">➕ إضافة الموظف</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== TRAINERS SECTION ====== -->
+    <div class="form-section animate-in" style="border-color:var(--primary);">
+        <div class="form-section-header" style="background:var(--bg-input); color:var(--primary);">🏋️ إدارة المدربين</div>
+        <div class="form-section-body">
+            <div id="adminTrainerList"></div>
+            <div style="border-top:1px solid var(--border-color);margin-top:20px;padding-top:20px;">
+                <h4 style="margin-bottom:14px;font-size:15px;color:var(--text-primary);">➕ إضافة مدرب جديد</h4>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>اسم المدرب</label>
+                        <input type="text" id="newTrainerName" placeholder="الاسم">
+                    </div>
+                    <div class="form-group">
+                        <label>التخصص</label>
+                        <input type="text" id="newTrainerSpec" placeholder="مثال: يوجا، بوكسينج">
+                    </div>
+                    <div class="form-group">
+                        <label>الفرع</label>
+                        <select id="newTrainerBranch">
+                            ${getSortedBranchesEntries(BRANCHES).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>الراتب الأساسي</label>
+                        <input type="number" id="newTrainerSalary" placeholder="3000">
+                    </div>
+                    <div class="form-group">
+                        <label>النسبة (%)</label>
+                        <input type="number" id="newTrainerPercent" placeholder="10">
+                    </div>
+                </div>
+                <button class="btn btn-primary" style="margin-top:14px;" onclick="adminAddTrainer()">➕ إضافة المدرب</button>
             </div>
         </div>
     </div>
@@ -2609,8 +2859,58 @@ function renderAdmin(el) {
 
     renderAdminBranchList();
     renderAdminEmployeeList();
+    renderAdminTrainerList();
+    renderAdminPasswordList();
     updateFolderStatusUI();
 }
+
+function renderAdminTrainerList() {
+    const container = document.getElementById('adminTrainerList');
+    if (!container) return;
+    if (TRAINERS.length === 0) {
+        container.innerHTML = '<div class="empty-state">لا يوجد مدربين</div>';
+        return;
+    }
+    container.innerHTML = `
+    <div class="table-wrapper"><table>
+        <thead><tr><th>المدرب</th><th>التخصص</th><th>الراتب</th><th>النسبة</th><th>الفرع</th><th>إجراءات</th></tr></thead>
+        <tbody>
+            ${TRAINERS.map(t => `
+            <tr>
+                <td><strong>${t.name}</strong></td>
+                <td>${t.specialty}</td>
+                <td>${t.salary} ج.م</td>
+                <td>${t.percentage}%</td>
+                <td>${BRANCHES[t.branch]?.name || t.branch}</td>
+                <td><button class="btn-remove" onclick="adminDeleteTrainer('${t.id}')">🗑️</button></td>
+            </tr>`).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+window.adminAddTrainer = function () {
+    const name = document.getElementById('newTrainerName').value.trim();
+    const specialty = document.getElementById('newTrainerSpec').value.trim();
+    const branch = document.getElementById('newTrainerBranch').value;
+    const salary = parseFloat(document.getElementById('newTrainerSalary').value) || 0;
+    const percentage = parseFloat(document.getElementById('newTrainerPercent').value) || 0;
+
+    if (!name) return showToast('يرجى إدخال اسم المدرب', 'error');
+
+    const id = 'T' + Date.now();
+    TRAINERS.push({ id, name, specialty, branch, salary, percentage });
+    saveData();
+    renderAdmin(document.getElementById('pageContent'));
+    showToast('تم إضافة المدرب بنجاح! 🎉');
+};
+
+window.adminDeleteTrainer = function (id) {
+    if (!confirm('هل أنت متأكد من حذف هذا المدرب؟')) return;
+    TRAINERS = TRAINERS.filter(t => t.id !== id);
+    saveData();
+    renderAdmin(document.getElementById('pageContent'));
+    showToast('تم حذف المدرب', 'error');
+};
 
 async function updateFolderStatusUI() {
     const badge = document.getElementById('folderStatusBadge');
@@ -2639,7 +2939,7 @@ async function updateFolderStatusUI() {
 function renderAdminBranchList() {
     const container = document.getElementById('adminBranchList');
     if (!container) return;
-    const entries = Object.entries(BRANCHES);
+    const entries = getSortedBranchesEntries(BRANCHES);
     if (entries.length === 0) {
         container.innerHTML = '<div class="empty-state"><span class="empty-icon">🏢</span><p>لا توجد فروع</p></div>';
         return;
@@ -2649,9 +2949,9 @@ function renderAdminBranchList() {
         <thead><tr><th>المعرّف</th><th>الاسم</th><th>المدينة</th><th>اللون</th><th>المديرة</th><th>السكرتارية</th><th>إجراءات</th></tr></thead>
         <tbody>
             ${entries.map(([key, b]) => {
-                const manager = EMPLOYEES.find(e => e.branch === key && e.role === 'مديرة الفرع');
-                const secretaries = EMPLOYEES.filter(e => e.branch === key && e.role !== 'مديرة الفرع');
-                return `<tr>
+        const manager = EMPLOYEES.find(e => e.branch === key && e.role === 'مديرة الفرع');
+        const secretaries = EMPLOYEES.filter(e => e.branch === key && e.role !== 'مديرة الفرع');
+        return `<tr>
                     <td><code style="background:var(--bg-input);padding:3px 8px;border-radius:4px;font-size:12px;">${key}</code></td>
                     <td>${b.name} <span style="cursor:pointer;font-size:13px;opacity:0.7;margin-right:6px;" title="تعديل الاسم" onclick="editBranchPrompt('${key}','name','الاسم')">✏️</span></td>
                     <td>${b.city} <span style="cursor:pointer;font-size:13px;opacity:0.7;margin-right:6px;" title="تعديل المدينة" onclick="editBranchPrompt('${key}','city','المدينة')">✏️</span></td>
@@ -2660,7 +2960,7 @@ function renderAdminBranchList() {
                     <td>${secretaries.map(s => `${s.name} <span style="cursor:pointer;font-size:13px;opacity:0.7;margin-right:6px;" title="تعديل السكرتارية" onclick="editEmpPrompt('${s.id}')">✏️</span>`).join(' &nbsp;،&nbsp; ') || '<span style="color:var(--text-muted)">—</span>'}</td>
                     <td><button class="btn-remove" onclick="adminDeleteBranch('${key}')">🗑️</button></td>
                 </tr>`;
-            }).join('')}
+    }).join('')}
         </tbody>
     </table></div>`;
 }
@@ -2675,7 +2975,7 @@ function renderAdminEmployeeList() {
 
     // Group by branch
     const grouped = {};
-    Object.entries(BRANCHES).forEach(([k,v]) => { grouped[k] = { branch: v, employees: [] }; });
+    Object.entries(BRANCHES).forEach(([k, v]) => { grouped[k] = { branch: v, employees: [] }; });
     EMPLOYEES.forEach(emp => {
         if (grouped[emp.branch]) grouped[emp.branch].employees.push(emp);
     });
@@ -2696,10 +2996,10 @@ function renderAdminEmployeeList() {
                         <td>${emp.name} <span style="cursor:pointer;font-size:13px;opacity:0.7;margin-right:6px;" title="تعديل اسم الموظف" onclick="editEmpPrompt('${emp.id}')">✏️</span></td>
                         <td>
                             <select onchange="adminEditEmployee('${emp.id}','role',this.value)" style="padding:6px 10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:6px;font-family:Cairo;font-size:13px;color:var(--text-primary);">
-                                <option value="مديرة الفرع" ${emp.role==='مديرة الفرع'?'selected':''}>مديرة الفرع</option>
-                                <option value="سكرتيرة" ${emp.role==='سكرتيرة'?'selected':''}>سكرتيرة</option>
-                                <option value="أستاذ" ${emp.role==='أستاذ'?'selected':''}>أستاذ</option>
-                                <option value="أخرى" ${!['مديرة الفرع','سكرتيرة','أستاذ'].includes(emp.role)?'selected':''}>أخرى</option>
+                                <option value="مديرة الفرع" ${emp.role === 'مديرة الفرع' ? 'selected' : ''}>مديرة الفرع</option>
+                                <option value="سكرتيرة" ${emp.role === 'سكرتيرة' ? 'selected' : ''}>سكرتيرة</option>
+                                <option value="أستاذ" ${emp.role === 'أستاذ' ? 'selected' : ''}>أستاذ</option>
+                                <option value="أخرى" ${!['مديرة الفرع', 'سكرتيرة', 'أستاذ'].includes(emp.role) ? 'selected' : ''}>أخرى</option>
                             </select>
                         </td>
                         <td><button class="btn-remove" onclick="adminDeleteEmployee('${emp.id}')">🗑️</button></td>
@@ -2711,7 +3011,7 @@ function renderAdminEmployeeList() {
 }
 
 // Admin CRUD Operations
-window.adminEditBranch = function(key, field, value) {
+window.adminEditBranch = function (key, field, value) {
     if (BRANCHES[key]) {
         BRANCHES[key][field] = value;
         saveData();
@@ -2719,7 +3019,7 @@ window.adminEditBranch = function(key, field, value) {
     }
 };
 
-window.adminSaveManagerName = function() {
+window.adminSaveManagerName = function () {
     const val = document.getElementById('adminManagerName').value.trim();
     if (!val) return showToast('يرجى إدخال اسم صحيح', 'error');
     AppState.managerName = val;
@@ -2729,7 +3029,7 @@ window.adminSaveManagerName = function() {
     updateUserDisplay();
 };
 
-window.adminSaveMasterPass = function() {
+window.adminSaveMasterPass = function () {
     const val = document.getElementById('adminMasterPass').value.trim();
     if (!val) return showToast('يرجى إدخال مفتاح صحيح', 'error');
     AppState.masterPassword = val;
@@ -2737,15 +3037,80 @@ window.adminSaveMasterPass = function() {
     showToast('تم حفظ المفتاح الماستر بنجاح 🔒');
 };
 
-window.adminSaveBackupPath = async function() {
+window.adminSaveManagerPass = function () {
+    const val = document.getElementById('adminManagerPass').value.trim();
+    if (!val) return showToast('يرجى إدخال كلمة سر صحيحة', 'error');
+    AppState.managerPassword = val;
+    localStorage.setItem('bms_manager_pass', val);
+    
+    // Cloud update if possible
+    if (window.db) {
+        db.ref(AppState.systemSecret + '/bms/settings/managerPassword').set(val);
+    }
+    
+    showToast('تم تحديث كلمة مرور المدير بنجاح ✅');
+};
+
+window.adminSaveBranchPass = function (key, val) {
+    if (!BRANCHES[key]) return;
+    const pass = val.trim() || '7788';
+    BRANCHES[key].password = pass;
+    
+    // 1. Save locally
+    saveData();
+
+    // 2. Force direct cloud sync for the password node
+    if (window.db) {
+        db.ref(AppState.systemSecret + '/bms/branches/' + key + '/password').set(pass)
+            .then(() => console.log(`☁️ Cloud Sync: Branch ${key} password updated.`))
+            .catch(err => console.error("❌ Cloud Sync Failed:", err));
+    }
+    
+    showToast(`تم تحديث كلمة مرور فرع ${BRANCHES[key].name} أونلاين ✅`, 'success');
+};
+
+function renderAdminPasswordList() {
+    const container = document.getElementById('adminPasswordList');
+    if (!container) return;
+    const entries = getSortedBranchesEntries(BRANCHES);
+    if (entries.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">لا توجد فروع لإدارة باسوورداتها</p>';
+        return;
+    }
+
+    container.innerHTML = `
+    <div class="table-wrapper"><table style="margin-top:10px;">
+        <thead><tr><th>الفرع</th><th>كلمة المرور الحالية</th><th>إجراء</th></tr></thead>
+        <tbody>
+            ${entries.map(([key, b]) => `
+                <tr>
+                    <td style="font-weight:700;color:var(--text-primary);">${b.name}</td>
+                    <td>
+                        <input type="text" class="form-input" value="${b.password || '7788'}" 
+                               style="width:120px;padding:5px 10px;text-align:center;font-family:monospace;"
+                               id="passInput_${key}">
+                    </td>
+                    <td>
+                        <button class="btn btn-secondary" style="padding:5px 15px;font-size:12px;" 
+                                onclick="adminSaveBranchPass('${key}', document.getElementById('passInput_${key}').value)">
+                            💾 حفظ
+                        </button>
+                    </td>
+                </tr>
+            `).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+window.adminSaveBackupPath = async function () {
     if (window.showDirectoryPicker) {
         try {
             const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
             await saveDirHandle(dirHandle);
-            
+
             AppState.backupPath = dirHandle.name;
             localStorage.setItem('bms_backup_path', dirHandle.name);
-            
+
             updateFolderStatusUI();
             showToast('تم ربط المجلد الإجباري للنظام بنجاح 📁', 'success');
         } catch (e) {
@@ -2757,7 +3122,7 @@ window.adminSaveBackupPath = async function() {
     }
 };
 
-window.adminDeleteBranch = function(key) {
+window.adminDeleteBranch = function (key) {
     if (!confirm(`هل أنت متأكد من حذف ${BRANCHES[key]?.name || key}؟`)) return;
     delete BRANCHES[key];
     EMPLOYEES = EMPLOYEES.filter(e => e.branch !== key);
@@ -2767,7 +3132,7 @@ window.adminDeleteBranch = function(key) {
     showToast('تم حذف الفرع وجميع موظفيه', 'error');
 };
 
-window.adminAddBranch = function() {
+window.adminAddBranch = function () {
     const key = document.getElementById('newBranchKey').value.trim().toLowerCase();
     const name = document.getElementById('newBranchName').value.trim();
     const city = document.getElementById('newBranchCity').value.trim();
@@ -2784,7 +3149,7 @@ window.adminAddBranch = function() {
     showToast('تم إضافة الفرع بنجاح! 🎉');
 };
 
-window.adminEditEmployee = function(id, field, value) {
+window.adminEditEmployee = function (id, field, value) {
     const emp = EMPLOYEES.find(e => e.id === id);
     if (emp) {
         emp[field] = value;
@@ -2793,7 +3158,7 @@ window.adminEditEmployee = function(id, field, value) {
     }
 };
 
-window.editEmpPrompt = function(id) {
+window.editEmpPrompt = function (id) {
     const emp = EMPLOYEES.find(e => e.id === id);
     if (!emp) return;
     window.customPrompt('✏️ تعديل اسم الموظف:', emp.name, (newName) => {
@@ -2805,7 +3170,7 @@ window.editEmpPrompt = function(id) {
     });
 };
 
-window.editBranchPrompt = function(key, field, label) {
+window.editBranchPrompt = function (key, field, label) {
     const b = BRANCHES[key];
     if (!b) return;
     window.customPrompt(`✏️ تعديل ${label}:`, b[field], (newVal) => {
@@ -2816,7 +3181,7 @@ window.editBranchPrompt = function(key, field, label) {
     });
 };
 
-window.adminDeleteEmployee = function(id) {
+window.adminDeleteEmployee = function (id) {
     const emp = EMPLOYEES.find(e => e.id === id);
     if (!emp) return;
     if (!confirm(`هل أنت متأكد من حذف ${emp.name}؟`)) return;
@@ -2826,35 +3191,35 @@ window.adminDeleteEmployee = function(id) {
     showToast('تم حذف الموظف', 'error');
 };
 
-window.changeAppColor = function(val) {
+window.changeAppColor = function (val) {
     document.documentElement.style.setProperty('--primary', val);
     document.documentElement.style.setProperty('--primary-light', val + '99');
     localStorage.setItem('bms_primary_color', val);
 };
 
-window.resetAppColor = function() {
+window.resetAppColor = function () {
     const defaultColor = '#008080';
     changeAppColor(defaultColor);
     const picker = document.getElementById('primaryColorPicker');
-    if(picker) picker.value = defaultColor;
+    if (picker) picker.value = defaultColor;
 };
 
-window.changeAppFontSize = function(val) {
+window.changeAppFontSize = function (val) {
     document.documentElement.style.fontSize = val + 'px';
     localStorage.setItem('bms_font_size', val);
 };
 
-window.resetFontSize = function() {
+window.resetFontSize = function () {
     const defaultSize = 16;
     changeAppFontSize(defaultSize);
     const slider = document.getElementById('fontSizeSlider');
-    if(slider) {
+    if (slider) {
         slider.value = defaultSize;
         slider.nextElementSibling.textContent = defaultSize + 'px';
     }
 };
 
-window.adminAddEmployee = function() {
+window.adminAddEmployee = function () {
     const name = document.getElementById('newEmpName').value.trim();
     const role = document.getElementById('newEmpRole').value;
     const branch = document.getElementById('newEmpBranch').value;
@@ -2870,38 +3235,66 @@ window.adminAddEmployee = function() {
     showToast('تم إضافة الموظف بنجاح! 🎉');
 };
 
-window.adminClearReports = function() {
-    if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع التقارير اليومية نهائياً!')) return;
+window.adminClearReports = function () {
+    if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع التقارير اليومية واليوميات المالية نهائياً!')) return;
+    
     AppState.reports = [];
-    localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
-    showToast('تم تصفير جميع التقارير', 'error');
+    AppState.ledgers = {};
+    
+    saveData();
+    showToast('تم تصفير جميع التقارير والبيانات المالية', 'error');
+    
+    // Refresh UI if on relevant pages
+    if (['dashboard', 'finance', 'report', 'dailybudget'].includes(AppState.currentPage)) {
+        navigate(AppState.currentPage);
+    }
 };
 
-window.adminClearEmployees = function() {
+window.adminClearEmployees = function () {
     if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع الموظفين من كل الفروع!')) return;
     EMPLOYEES = [];
     saveData();
-    renderAdminEmployeeList();
-    renderAdminBranchList();
+    renderAdmin(document.getElementById('pageContent'));
     showToast('تم تصفير جميع الموظفين', 'error');
 };
 
-window.adminClearBranches = function() {
-    if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع الفروع وجميع الموظفين معهم!')) return;
+window.adminClearBranches = function () {
+    if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع الفروع وكل ما يتعلق بها!')) return;
     BRANCHES = {};
     EMPLOYEES = [];
+    AppState.reports = [];
+    AppState.ledgers = {};
+    AppState.budgets = [];
+    
     saveData();
-    renderAdminBranchList();
-    renderAdminEmployeeList();
-    showToast('تم تصفير جميع الفروع والموظفين', 'error');
+    renderAdmin(document.getElementById('pageContent'));
+    showToast('تم تصفير جميع الفروع وكل البيانات', 'error');
 };
 
-window.adminResetAll = function() {
-    if (!confirm('⛔ هل أنت متأكد من إعادة ضبط المصنع الكامل؟\n\nسيتم حذف:\n• جميع الفروع\n• جميع الموظفين\n• جميع التقارير\n\nوإعادتها للإعدادات الافتراضية!')) return;
-    BRANCHES = {...DEFAULT_BRANCHES};
+window.adminResetAll = function () {
+    if (!confirm('⛔ هل أنت متأكد من إعادة ضبط المصنع الكامل؟\n\nسيتم حذف:\n• جميع الفروع\n• جميع الموظفين\n• جميع التقارير\n• جميع الحركات المالية (اليوميات)\n\nوإعادتها للإعدادات الافتراضية!')) return;
+    
+    BRANCHES = { ...DEFAULT_BRANCHES };
     EMPLOYEES = [...DEFAULT_EMPLOYEES];
+    TRAINERS = [...DEFAULT_TRAINERS];
     AppState.reports = [];
+    AppState.ledgers = {};
+    AppState.budgets = [];
+    
     saveData();
+    
+    // Clear cloud totally to ensure fresh start
+    if (window.db) {
+        db.ref(AppState.systemSecret + '/bms').set({
+            branches: DEFAULT_BRANCHES,
+            employees: DEFAULT_EMPLOYEES,
+            trainers: DEFAULT_TRAINERS,
+            reports: [],
+            budgets: [],
+            ledgers: {}
+        });
+    }
+    
     renderAdmin(document.getElementById('pageContent'));
     showToast('تم إعادة ضبط المصنع بالكامل ✅');
 };
@@ -2909,33 +3302,33 @@ window.adminResetAll = function() {
 // -------------------------
 // Page: Daily Budget Ledger
 // -------------------------
-window.renderDailyBudget = function(el) {
+window.renderDailyBudget = function (el) {
     const isBranch = AppState.userRole === 'branch';
     const activeBranch = isBranch ? AppState.userBranch : (AppState.currentBranch !== 'all' ? AppState.currentBranch : Object.keys(BRANCHES)[0]);
     const activeDate = AppState.activeLedgerDate || today();
     const ledgerKey = `${activeBranch}_${activeDate}`;
-    
+
     // Ensure ledger object exists
     if (!AppState.ledgers[ledgerKey]) {
         AppState.ledgers[ledgerKey] = {
             previousBalance: 0,
-            rows: [{ bookingType: '', value: 0, receiptNo: '', clientName: '', expense: 0, type: '', notes: '' }]
+            rows: [{ bookingType: '', value: '', receiptNo: '', clientName: '', expense: '', type: '', notes: '' }]
         }
     }
-    
+
     // [Continuity Logic] Auto-fetch last balance if current is 0
     if (AppState.ledgers[ledgerKey].previousBalance === 0) {
         fetchLastLedgerBalance(activeBranch, activeDate);
     }
-    
+
     const ledger = AppState.ledgers[ledgerKey];
     const dayName = arabicDate(activeDate).split('،')[0];
 
     el.innerHTML = `
     <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
         <div>
-            <h1 style="color:var(--primary); font-weight:900;">📊 اليومية والميزانية</h1>
-            <p style="opacity:0.7;">إدارة الحركات المالية لفرع ${BRANCHES[activeBranch]?.name || activeBranch}</p>
+            <h1 style="color:var(--text-primary); font-weight:900;">📊 اليومية والميزانية</h1>
+            <p style="opacity:0.7; color:var(--text-secondary);">إدارة الحركات المالية لفرع ${BRANCHES[activeBranch]?.name || activeBranch}</p>
         </div>
         <div style="display:flex; gap:15px; align-items:center; background:var(--bg-card); padding:8px 15px; border-radius:100px; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
             <!-- TODAY BUTTON -->
@@ -2947,18 +3340,18 @@ window.renderDailyBudget = function(el) {
             <!-- PREVIOUS BALANCE CAPSULE -->
             <div class="capsule-input" style="background:#f1c40f22 !important; border-color:#f1c40f !important; padding:5px 15px !important; min-width:160px;">
                 <label style="font-size:11px; color:#d35400; font-weight:bold; margin-left:8px;">الإيراد السابق:</label>
-                <input type="number" value="${ledger.previousBalance||0}" onchange="updateLedgerPreviousBalance('${ledgerKey}', this.value)" style="color:#d35400 !important; font-size:16px !important; width:90px;">
+                <input type="number" value="${ledger.previousBalance || ''}" placeholder="0" onchange="updateLedgerPreviousBalance('${ledgerKey}', this.value)" style="color:#d35400 !important; font-size:16px !important; width:90px;">
             </div>
 
             ${!isBranch ? `
             <select class="form-input" onchange="changeLedgerBranch(this.value)" style="border:none; background:transparent; font-weight:900; border-right:1px solid var(--border-color); padding-right:15px; color:var(--text-primary); outline:none;">
-                ${Object.entries(BRANCHES).map(([k,v]) => `<option value="${k}" ${k===activeBranch?'selected':''}>${v.name}</option>`).join('')}
+                ${Object.entries(BRANCHES).map(([k, v]) => `<option value="${k}" ${k === activeBranch ? 'selected' : ''}>${v.name}</option>`).join('')}
             </select>` : ''}
         </div>
     </div>
 
         <!-- MODERN LEDGER TABLE HEADER -->
-        <div class="official-table-grid" style="grid-template-columns: 50px 1fr 90px 90px 1fr 90px 1fr 1.2fr; background: #2c3e50; color:#fff; font-weight:950; font-size:13px; text-align:center; border-radius:100px; margin-bottom:15px; padding:15px 0; box-shadow:0 8px 15px rgba(0,0,0,0.1); gap:10px;">
+        <div class="official-table-grid" style="grid-template-columns: 50px 1.5fr 110px 110px 1.5fr 110px 1.5fr 1.8fr; background: #2c3e50; color:#fff; font-weight:950; font-size:13px; text-align:center; border-radius:100px; margin-bottom:15px; padding:15px 0; box-shadow:0 8px 15px rgba(0,0,0,0.1); gap:10px;">
             <div>م</div>
             <div>بيان الحجز</div>
             <div>الوارد (+)</div>
@@ -2977,32 +3370,32 @@ window.renderDailyBudget = function(el) {
                 
                 <!-- Statement Capsule (Large) -->
                 <div class="capsule-input capsule-large">
-                    <input type="text" placeholder="بيان الحجز..." value="${row.bookingType||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'bookingType', this.value)">
+                    <input type="text" placeholder="بيان الحجز..." value="${row.bookingType || ''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'bookingType', this.value)">
                 </div>
 
                 <!-- Inflow Capsule (Small/Green) -->
                 <div class="capsule-input capsule-small inflow-accent">
-                    <input type="number" placeholder="الوارد" value="${row.value||0}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'value', this.value)">
+                    <input type="number" placeholder="0" value="${row.value || ''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'value', this.value)">
                 </div>
 
                 <!-- Receipt Capsule (Small) -->
                 <div class="capsule-input capsule-small">
-                    <input type="text" placeholder="إيصال" value="${row.receiptNo||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'receiptNo', this.value)">
+                    <input type="text" placeholder="إيصال" value="${row.receiptNo || ''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'receiptNo', this.value)">
                 </div>
 
                 <!-- Client Capsule (Wide) -->
                 <div class="capsule-input capsule-wide">
-                    <input type="text" placeholder="اسم العميل" value="${row.clientName||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'clientName', this.value)">
+                    <input type="text" placeholder="اسم العميل" value="${row.clientName || ''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'clientName', this.value)">
                 </div>
 
                 <!-- Outflow Capsule (Small/Red) -->
                 <div class="capsule-input capsule-small outflow-accent">
-                    <input type="number" placeholder="المنصرف" value="${row.expense||0}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'expense', this.value)">
+                    <input type="number" placeholder="0" value="${row.expense || ''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'expense', this.value)">
                 </div>
 
                 <!-- Exp Type Capsule (Medium) -->
                 <div class="capsule-input capsule-medium">
-                    <input type="text" placeholder="بيان المنصرف" value="${row.type||''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'type', this.value)">
+                    <input type="text" placeholder="بيان المنصرف" value="${row.type || ''}" onchange="updateLedgerRow('${ledgerKey}', ${idx}, 'type', this.value)">
                 </div>
 
                 <!-- Notes Capsule (Medium) -->
@@ -3024,7 +3417,7 @@ window.renderDailyBudget = function(el) {
                 <div id="ledgerTotalOutflow" style="font-size:28px; font-weight:950; color:#e74c3c;">${formatNumber(calculateLedgerOutflow(ledgerKey))}</div>
             </div>
             <div class="neon-summary-card" style="background:var(--gradient-primary); border-radius:20px; padding:20px; text-align:center; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-                <div style="color:rgba(255,255,255,0.8); font-size:13px; font-weight:700; margin-bottom:10px;">📊 الرصيد النهائي لليوم</div>
+                <div style="color:#ffffff; font-size:15px; font-weight:950; margin-bottom:12px; letter-spacing:0.5px;">📊 الصافي النهائي لليوم (شامل الرصيد السابق)</div>
                 <div id="ledgerEndBalance" style="font-size:32px; font-weight:950; color:#fff; text-shadow: 0 0 15px rgba(255,255,255,0.3);">${formatNumber(calculateLedgerEndBalance(ledgerKey))}</div>
             </div>
         </div>
@@ -3039,12 +3432,12 @@ window.renderDailyBudget = function(el) {
     `;
 };
 
-window.resetLedgerToToday = function() {
+window.resetLedgerToToday = function () {
     AppState.activeLedgerDate = today();
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
-window.exportLedgerPDF = async function(key) {
+window.exportLedgerPDF = async function (key) {
     const element = document.getElementById('ledgerCaptureArea');
     if (!element) return;
 
@@ -3085,8 +3478,8 @@ window.exportLedgerPDF = async function(key) {
         margin: 5,
         filename: `يومية_${branchName}_${date}.pdf`,
         image: { type: 'jpeg', quality: 1.0 },
-        html2canvas: { 
-            scale: 2, 
+        html2canvas: {
+            scale: 2,
             useCORS: true,
             logging: false,
             letterRendering: true,
@@ -3096,7 +3489,7 @@ window.exportLedgerPDF = async function(key) {
     };
 
     showToast('⏳ جاري استخراج التقرير بصيغة PDF...', 'info');
-    
+
     // Tiny delay to ensure styles and sync are applied
     setTimeout(async () => {
         try {
@@ -3121,28 +3514,28 @@ window.exportLedgerPDF = async function(key) {
     }, 500);
 };
 
-window.changeLedgerDate = function(val) {
+window.changeLedgerDate = function (val) {
     AppState.activeLedgerDate = val;
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
-window.changeLedgerBranch = function(val) {
+window.changeLedgerBranch = function (val) {
     AppState.currentBranch = val;
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
-window.updateLedgerMeta = function(key, field, val) {
+window.updateLedgerMeta = function (key, field, val) {
     if (!AppState.ledgers[key]) return;
     AppState.ledgers[key][field] = parseFloat(val) || 0;
     saveLedgerEntry(key);
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
-window.updateLedgerPreviousBalance = function(key, val) {
+window.updateLedgerPreviousBalance = function (key, val) {
     if (!AppState.ledgers[key]) return;
     const numericVal = parseFloat(val) || 0;
     AppState.ledgers[key].previousBalance = numericVal;
-    
+
     // [Sync Logic] Update Report financials if report exists for the same branch and date
     const parts = key.split('_');
     const bKey = parts[0];
@@ -3162,19 +3555,19 @@ window.updateLedgerPreviousBalance = function(key, val) {
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
-window.fetchLastLedgerBalance = function(branchKey, activeDate) {
+window.fetchLastLedgerBalance = function (branchKey, activeDate) {
     // Find previous ledger entry
     const dates = Object.keys(AppState.ledgers)
         .filter(k => k.startsWith(branchKey + '_'))
         .map(k => k.split('_')[1])
         .filter(d => d < activeDate)
-        .sort((a,b) => b.localeCompare(a));
+        .sort((a, b) => b.localeCompare(a));
 
     if (dates.length > 0) {
         const lastDate = dates[0];
         const lastKey = `${branchKey}_${lastDate}`;
         const lastBalance = calculateLedgerEndBalance(lastKey);
-        
+
         if (lastBalance > 0) {
             AppState.ledgers[`${branchKey}_${activeDate}`].previousBalance = lastBalance;
             showToast(`تم ترحيل رصيد ${formatNumber(lastBalance)} من يوم ${lastDate} بنجاح`, 'success');
@@ -3184,7 +3577,7 @@ window.fetchLastLedgerBalance = function(branchKey, activeDate) {
         const pastReports = AppState.reports
             .filter(r => r.branch === branchKey && r.date < activeDate)
             .sort((a, b) => b.date.localeCompare(a.date));
-        
+
         if (pastReports.length > 0) {
             const lastReport = pastReports[0];
             const lastBalance = lastReport.currentBalance || lastReport.financials?.totalNet || 0;
@@ -3196,7 +3589,7 @@ window.fetchLastLedgerBalance = function(branchKey, activeDate) {
     }
 };
 
-window.updateLedgerRow = function(key, idx, field, val) {
+window.updateLedgerRow = function (key, idx, field, val) {
     if (!AppState.ledgers[key]) return;
     if (field === 'value' || field === 'expense') val = parseFloat(val) || 0;
     AppState.ledgers[key].rows[idx][field] = val;
@@ -3207,14 +3600,14 @@ window.updateLedgerRow = function(key, idx, field, val) {
     document.getElementById('ledgerEndBalance').textContent = formatNumber(calculateLedgerEndBalance(key));
 };
 
-window.addLedgerRow = function(key) {
+window.addLedgerRow = function (key) {
     if (!AppState.ledgers[key]) return;
-    AppState.ledgers[key].rows.push({ bookingType: '', value: 0, receiptNo: '', clientName: '', expense: 0, type: '', notes: '' });
+    AppState.ledgers[key].rows.push({ bookingType: '', value: '', receiptNo: '', clientName: '', expense: '', type: '', notes: '' });
     saveLedgerEntry(key);
     renderDailyBudget(document.getElementById('pageContent'));
 };
 
-window.saveLedger = function(key) {
+window.saveLedger = function (key) {
     saveLedgerEntry(key);
     showToast('تم حفظ اليومية بنجاح 💾', 'success');
 };
@@ -3222,10 +3615,10 @@ window.saveLedger = function(key) {
 // New Atomic Ledger Sync Function
 function saveLedgerEntry(key) {
     if (!AppState.ledgers[key]) return;
-    
+
     // Update local storage
     localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
-    
+
     // Atomic Cloud Update
     if (window.db && AppState.isInitialSyncComplete) {
         db.ref(AppState.systemSecret + '/bms/ledgers/' + key).set(AppState.ledgers[key]);
@@ -3235,26 +3628,26 @@ function saveLedgerEntry(key) {
     }
 }
 
-window.isLedgerActive = function(key) {
+window.isLedgerActive = function (key) {
     const l = AppState.ledgers[key];
     if (!l) return false;
     if (parseFloat(l.previousBalance) > 0) return true;
     return l.rows.some(r => parseFloat(r.value) > 0 || parseFloat(r.expense) > 0);
 };
 
-window.calculateLedgerInflow = function(key) {
+window.calculateLedgerInflow = function (key) {
     const l = AppState.ledgers[key];
     if (!l) return 0;
     return l.rows.reduce((s, r) => s + (parseFloat(r.value) || 0), 0);
 };
 
-window.calculateLedgerOutflow = function(key) {
+window.calculateLedgerOutflow = function (key) {
     const l = AppState.ledgers[key];
     if (!l) return 0;
     return l.rows.reduce((s, r) => s + (parseFloat(r.expense) || 0), 0);
 };
 
-window.calculateLedgerEndBalance = function(key) {
+window.calculateLedgerEndBalance = function (key) {
     const l = AppState.ledgers[key];
     if (!l) return 0;
     const inflow = calculateLedgerInflow(key);
@@ -3277,14 +3670,14 @@ function startClock() {
     const minEl = document.getElementById('min');
     const secEl = document.getElementById('sec');
     if (!hrsEl || !minEl || !secEl) return;
-    
+
     function update() {
         const now = new Date();
         hrsEl.textContent = String(now.getHours()).padStart(2, '0');
         minEl.textContent = String(now.getMinutes()).padStart(2, '0');
         secEl.textContent = String(now.getSeconds()).padStart(2, '0');
     }
-    
+
     update();
     setInterval(update, 1000);
 }
@@ -3297,7 +3690,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!localStorage.getItem('bms_fresh_start_v3')) {
         console.log("🧹 Clearing legacy test data...");
         AppState.reports = [];
-        BRANCHES = {...DEFAULT_BRANCHES};
+        BRANCHES = { ...DEFAULT_BRANCHES };
         EMPLOYEES = [...DEFAULT_EMPLOYEES];
         saveData();
         localStorage.setItem('bms_fresh_start_v3', 'true');
@@ -3350,19 +3743,43 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Modern Branch Selector Initialization ---
-    window.toggleCustomSelect = function(id) {
+    window.toggleCustomSelect = function (id) {
+        const wrapper = document.getElementById(id + '-wrapper');
         const options = document.getElementById(id + '-options');
-        if (options) options.classList.toggle('show');
+        if (options) {
+            const isOpening = !options.classList.contains('show');
+
+            // Close all others first
+            document.querySelectorAll('.custom-options').forEach(opt => {
+                opt.classList.remove('show');
+                const w = opt.parentElement;
+                if (w) w.style.zIndex = "";
+            });
+
+            if (isOpening) {
+                options.classList.add('show');
+                if (wrapper) wrapper.style.zIndex = "99999";
+            } else {
+                options.classList.remove('show');
+                if (wrapper) wrapper.style.zIndex = "";
+            }
+        }
     };
 
-    window.selectCustomOption = function(id, val, name, color, callbackName) {
+    window.selectCustomOption = function (id, val, name, color, callbackName) {
         const trigger = document.getElementById(id + '-trigger');
         const triggerText = document.getElementById(id + '-text');
         const options = document.getElementById(id + '-options');
-        
-        if (trigger) trigger.style.background = color;
+
+        if (trigger) {
+            trigger.style.background = color;
+            trigger.dataset.value = val; // Crucial fix: update the actual value used for filtering
+        }
         if (triggerText) triggerText.innerText = name;
         if (options) options.classList.remove('show');
+
+        const wrapper = document.getElementById(id + '-wrapper');
+        if (wrapper) wrapper.style.zIndex = "";
 
         // Execute original logic
         if (callbackName && typeof window[callbackName] === 'function') {
@@ -3373,7 +3790,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global listener to close dropdowns when clicking outside
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.custom-select-wrapper')) {
-            document.querySelectorAll('.custom-options').forEach(opt => opt.classList.remove('show'));
+            document.querySelectorAll('.custom-options').forEach(opt => {
+                opt.classList.remove('show');
+                const w = opt.parentElement;
+                if (w) w.style.zIndex = "";
+            });
         }
     });
 
@@ -3432,3 +3853,86 @@ document.addEventListener('DOMContentLoaded', () => {
         checkSeeding();
     }
 });
+
+// --- PREMIUM FLOATING CALCULATOR LOGIC ---
+window.openCalculator = function () {
+    let calc = document.getElementById('floatingCalculator');
+    if (calc) {
+        calc.style.display = calc.style.display === 'none' ? 'block' : 'none';
+        return;
+    }
+
+    calc = document.createElement('div');
+    calc.id = 'floatingCalculator';
+    calc.className = 'floating-calc animate-in';
+    calc.innerHTML = `
+        <div class="calc-header">
+            <span>🧮 الحاسبة الذكية</span>
+            <button onclick="document.getElementById('floatingCalculator').style.display='none'">✕</button>
+        </div>
+        <div class="calc-display">
+            <input type="text" id="calcScreen" readonly value="0">
+        </div>
+        <div class="calc-buttons">
+            <button onclick="clearCalc()" style="color:#e74c3c;">C</button>
+            <button onclick="calcInput('/')">÷</button>
+            <button onclick="calcInput('*')">×</button>
+            <button onclick="backspaceCalc()">⌫</button>
+            
+            <button onclick="calcInput('7')">7</button>
+            <button onclick="calcInput('8')">8</button>
+            <button onclick="calcInput('9')">9</button>
+            <button onclick="calcInput('-')">-</button>
+            
+            <button onclick="calcInput('4')">4</button>
+            <button onclick="calcInput('5')">5</button>
+            <button onclick="calcInput('6')">6</button>
+            <button onclick="calcInput('+')">+</button>
+            
+            <button onclick="calcInput('1')">1</button>
+            <button onclick="calcInput('2')">2</button>
+            <button onclick="calcInput('3')">3</button>
+            <button onclick="calculateResult()" style="grid-row: span 2; height: 100%; background: var(--gradient-primary); color:#fff; border:none; font-size:20px;">＝</button>
+            
+            <button onclick="calcInput('0')" style="grid-column: span 2;">0</button>
+            <button onclick="calcInput('.')">.</button>
+        </div>
+    `;
+    document.body.appendChild(calc);
+
+    const header = calc.querySelector('.calc-header');
+    let isDragging = false, offsetX, offsetY;
+    header.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        offsetX = e.clientX - calc.offsetLeft;
+        offsetY = e.clientY - calc.offsetTop;
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        calc.style.left = (e.clientX - offsetX) + 'px';
+        calc.style.top = (e.clientY - offsetY) + 'px';
+        calc.style.right = 'auto';
+    });
+    document.addEventListener('mouseup', () => { isDragging = false; });
+};
+
+window.calcInput = function (val) {
+    const screen = document.getElementById('calcScreen');
+    if (screen.value === '0') screen.value = val;
+    else screen.value += val;
+};
+window.clearCalc = function () { document.getElementById('calcScreen').value = '0'; };
+window.backspaceCalc = function () {
+    const screen = document.getElementById('calcScreen');
+    screen.value = screen.value.length > 1 ? screen.value.slice(0, -1) : '0';
+};
+window.calculateResult = function () {
+    try {
+        const screen = document.getElementById('calcScreen');
+        screen.value = eval(screen.value.replace(/×/g, '*').replace(/÷/g, '/'));
+    } catch (e) {
+        showToast('⚠️ خطأ في العملية', 'error');
+        window.clearCalc();
+    }
+};
+

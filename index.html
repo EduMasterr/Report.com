@@ -46,6 +46,10 @@
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">الموظفين</span>
             </a>
+            <a href="#" class="nav-item" data-page="trainers" id="nav-trainers">
+                <span class="nav-icon">🏋️</span>
+                <span class="nav-label">المدربين</span>
+            </a>
             <a href="#" class="nav-item" data-page="finance" id="nav-finance">
                 <span class="nav-icon">💰</span>
                 <span class="nav-label">المالية</span>
@@ -53,6 +57,12 @@
             <a href="#" class="nav-item" data-page="dailybudget" id="nav-dailybudget">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">الميزانية اليومية</span>
+            </a>
+            <!-- Logout added here for mobile visibility as requested -->
+            <a href="javascript:void(0)" class="nav-item logout-nav-item" onclick="logout()"
+                style="color: #e74c3c; font-weight: 700;">
+                <span class="nav-icon">🚪</span>
+                <span class="nav-label">تسجيل الخروج</span>
             </a>
             <a href="#" class="nav-item" data-page="admin" id="nav-admin">
                 <span class="nav-icon">⚙️</span>
@@ -80,9 +90,16 @@
         <!-- Top Bar -->
         <header class="topbar">
             <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open Menu">☰</button>
-            <div class="topbar-title">
-                <h2 id="pageTitle">لوحة التحكم</h2>
-                <span class="topbar-date" id="currentDate"></span>
+            <div class="topbar-title"
+                style="display:flex; align-items:center; gap:20px; flex:1; justify-content: flex-start;">
+                <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                    <h2 id="pageTitle"
+                        style="margin:0; font-size:24px; font-weight:950; color:var(--text-primary); line-height:1;">
+                        لوحة التحكم</h2>
+                    <span class="topbar-date" id="currentDate"
+                        style="color:var(--text-secondary); font-weight:700; font-size:15px; margin-top:4px;"></span>
+                </div>
+                <button class="calc-app-btn" onclick="openCalculator()" title="الآلة الحاسبة">🧮</button>
             </div>
 
             <div class="digital-clock" id="digitalClock">
@@ -95,32 +112,12 @@
             </div>
 
             <div class="topbar-actions">
-                <div class="branch-selector">
-                    <div class="custom-select-wrapper" id="branchSelect-wrapper">
-                        <div class="custom-select-trigger" id="branchSelect-trigger" style="background:#001f3f;" onclick="toggleCustomSelect('branchSelect')">
-                            <span id="branchSelect-text">جميع الفروع (تقرير مجمع)</span>
-                            <span class="chevron">▼</span>
-                        </div>
-                        <div class="custom-options" id="branchSelect-options">
-                            <div class="custom-option" onclick="selectCustomOption('branchSelect','all','جميع الفروع (تقرير مجمع)','#001f3f','handleTopbarBranchChange')">جميع الفروع (تقرير مجمع)</div>
-                            <div class="custom-option" onclick="selectCustomOption('branchSelect','miami','فرع ميامي','#1a5276','handleTopbarBranchChange')">فرع ميامي</div>
-                            <div class="custom-option" onclick="selectCustomOption('branchSelect','mandara','فرع المندرة','#512e5f','handleTopbarBranchChange')">فرع المندرة</div>
-                            <div class="custom-option" onclick="selectCustomOption('branchSelect','soyouf','فرع السيوف','#8B0000','handleTopbarBranchChange')">فرع السيوف</div>
-                            <div class="custom-option" onclick="selectCustomOption('branchSelect','smouha','فرع سموحة','#1d6a3e','handleTopbarBranchChange')">فرع سموحة</div>
-                            <div class="custom-option" onclick="selectCustomOption('branchSelect','agamy','فرع العجمي','#7d6608','handleTopbarBranchChange')">فرع العجمي</div>
-                            <div class="custom-option" onclick="selectCustomOption('branchSelect','branch6','الفرع السادس','#2c3e50','handleTopbarBranchChange')">الفرع السادس</div>
-                        </div>
-                    </div>
-                </div>
+                <div class="branch-selector" id="topbarBranchSelector"></div>
                 <div class="user-profile-group"
                     style="display:flex; flex-direction:column; align-items:center; gap:2px;">
                     <div class="user-avatar" id="userAvatar" style="margin:0;">
                         <span>م</span>
                     </div>
-                    <button onclick="logout()"
-                        style="background:none; border:none; color:var(--text-secondary); font-size:10px; font-weight:700; cursor:pointer; padding:2px 5px; border-radius:4px; transition:var(--transition); margin-top:2px;"
-                        onmouseover="this.style.color='#e74c3c'; this.style.background='rgba(231, 76, 60, 0.1)'"
-                        onmouseout="this.style.color='var(--text-secondary)'; this.style.background='none'">خروج</button>
                 </div>
             </div>
         </header>
