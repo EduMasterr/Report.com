@@ -1,6 +1,6 @@
-/* =============================================
+/* ===
    app.js — Branch Management SPA
-   ============================================= */
+   === */
 
 // -------------------------
 // State & Data Store
@@ -19,6 +19,10 @@ const AppState = {
     managerPassword: localStorage.getItem('bms_manager_pass') || 'admin_2026',
     backupPath: localStorage.getItem('bms_backup_path') || 'D:\\\\Backups-Report',
     ledgers: JSON.parse(localStorage.getItem('bms_ledgers') || '{}'),
+
+    trainers: JSON.parse(localStorage.getItem('bms_trainers') || '[]'),
+
+
     systemSecret: 'ReportV2_SecurePath_882', // Dynamic path for cloud data
     isInitialSyncComplete: false // Nitro-Block Protection
 };
@@ -67,11 +71,20 @@ const DEFAULT_EMPLOYEES = [
     { id: 'E016', name: 'ريهام', role: 'مديرة الفرع', branch: 'branch6' },
     { id: 'E017', name: 'س1', role: 'سكرتيرة', branch: 'branch6' },
     { id: 'E018', name: 'س2', role: 'سكرتيرة', branch: 'branch6' },
+
+];
+
+const DEFAULT_TRAINERS = [
+    { id: 'T001', name: 'كابتن أحمد', specialty: 'لياقة بدنية', branch: 'miami', salary: 3000, percentage: 10 },
+    { id: 'T002', name: 'كابتن سارة', specialty: 'يوجا', branch: 'mandara', salary: 2500, percentage: 15 }
+
+
 ];
 
 // Dynamic data — load from localStorage or seed from defaults
 let BRANCHES = JSON.parse(localStorage.getItem('bms_branches') || 'null') || { ...DEFAULT_BRANCHES };
 let EMPLOYEES = JSON.parse(localStorage.getItem('bms_employees') || 'null') || [...DEFAULT_EMPLOYEES];
+let TRAINERS = JSON.parse(localStorage.getItem('bms_trainers') || 'null') || [...DEFAULT_TRAINERS];
 
 // -------------------------
 // Firebase Sync & Cloud Storage
@@ -103,6 +116,19 @@ window.syncWithCloud = function () {
             console.log("✅ Employees synced");
         }
     });
+
+
+    // Real-time trainers
+    db.ref(AppState.systemSecret + '/bms/trainers').on('value', snap => {
+        if (!AppState.userRole) return;
+        if (snap.exists()) {
+            TRAINERS = snap.val();
+            localStorage.setItem('bms_trainers', JSON.stringify(TRAINERS));
+            console.log("✅ Trainers synced");
+        }
+    });
+
+
 
     // Real-time settings (Passwords etc)
     db.ref(AppState.systemSecret + '/bms/settings').on('value', snap => {
@@ -218,6 +244,7 @@ function saveData() {
     localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
     localStorage.setItem('bms_branches', JSON.stringify(BRANCHES));
     localStorage.setItem('bms_employees', JSON.stringify(EMPLOYEES));
+    localStorage.setItem('bms_trainers', JSON.stringify(TRAINERS));
     localStorage.setItem('bms_budgets', JSON.stringify(AppState.budgets));
     localStorage.setItem('bms_ledgers', JSON.stringify(AppState.ledgers));
 
@@ -233,12 +260,20 @@ function saveData() {
         updates['/reports'] = AppState.reports || [];
         updates['/branches'] = BRANCHES || {};
         updates['/employees'] = EMPLOYEES || [];
+        updates['/trainers'] = TRAINERS || [];
         updates['/budgets'] = AppState.budgets || [];
+
+
+        // Overwrite ledgers to ensure clearing and full sync works correctly
+        db.ref(AppState.systemSecret + '/bms/ledgers').set(AppState.ledgers || {});
+
+        // Push bulk sets for other categories
 
         // Specially update ledgers to MERGE branch entries
         db.ref(AppState.systemSecret + '/bms/ledgers').update(AppState.ledgers || {});
 
         // Push bulk updates for other categories
+
         db.ref(AppState.systemSecret + '/bms').update(updates);
 
         console.log("☁️ Nitro-Sync: Cloud updated atomically.");
@@ -247,6 +282,10 @@ function saveData() {
 
 // Seed logic (only if Firebase is totally empty)
 function checkSeeding() {
+    if (!window.db) {
+        setTimeout(checkSeeding, 500);
+        return;
+    }
     db.ref(AppState.systemSecret + '/bms').once('value', snap => {
         if (!snap.exists()) {
             console.log("🌱 Initial seeding to cloud...");
@@ -254,6 +293,7 @@ function checkSeeding() {
             db.ref(AppState.systemSecret + '/bms/employees').set(DEFAULT_EMPLOYEES);
             db.ref(AppState.systemSecret + '/bms/reports').set([]);
             db.ref(AppState.systemSecret + '/bms/budgets').set([]);
+            db.ref(AppState.systemSecret + '/bms/trainers').set(DEFAULT_TRAINERS);
         }
     });
 }
@@ -333,7 +373,11 @@ function deduplicateReports(reports) {
 }
 
 function today() {
-    return new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
 }
 
 function arabicDate(dateStr) {
@@ -360,6 +404,43 @@ function showToast(msg, type = 'success') {
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 3500);
 }
+
+
+window.customAlert = function (title, msg, type = 'success') {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Cairo,sans-serif;';
+
+    const box = document.createElement('div');
+    box.className = 'form-section animate-glow-in';
+    box.style.cssText = 'background:var(--bg-card);border:1px solid var(--border-color);border-radius:20px;padding:40px;width:90%;max-width:500px;box-shadow:0 25px 50px rgba(0,0,0,0.5);text-align:center;border-top:6px solid ' + (type === 'success' ? '#27ae60' : '#e74c3c') + ';';
+
+    const iconEl = document.createElement('div');
+    iconEl.textContent = type === 'success' ? '✅' : '⚠️';
+    iconEl.style.cssText = 'font-size:60px;margin-bottom:20px;';
+
+    const titleEl = document.createElement('h2');
+    titleEl.textContent = title;
+    titleEl.style.cssText = 'color:var(--text-primary);margin-bottom:15px;font-size:24px;font-weight:bold;';
+
+    const msgEl = document.createElement('p');
+    msgEl.textContent = msg;
+    msgEl.style.cssText = 'color:var(--text-secondary);margin-bottom:30px;font-size:18px;line-height:1.6;';
+
+    const okBtn = document.createElement('button');
+    okBtn.textContent = 'حسناً، تم الانتهاء';
+    okBtn.className = 'btn btn-primary';
+    okBtn.style.cssText = 'padding:12px 60px; font-size:18px; border-radius:12px;';
+    okBtn.onclick = () => overlay.remove();
+
+    box.appendChild(iconEl);
+    box.appendChild(titleEl);
+    box.appendChild(msgEl);
+    box.appendChild(okBtn);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+};
+
+
 
 window.customPrompt = function (title, defaultValue, callback) {
     const overlay = document.createElement('div');
@@ -827,6 +908,11 @@ function updateNavVisibility() {
     document.getElementById('nav-finance').style.setProperty('display', (isDev) ? 'none' : (isDev || isManager || isBranch ? '' : 'none'), 'important');
     const navDailyBudget = document.getElementById('nav-dailybudget');
     if (navDailyBudget) navDailyBudget.style.setProperty('display', (isDev) ? 'none' : (isDev || isBranch ? '' : 'none'), 'important');
+
+    const navTrainers = document.getElementById('nav-trainers');
+    if (navTrainers) navTrainers.style.setProperty('display', (isDev) ? 'none' : (isDev || isManager || isBranch ? '' : 'none'), 'important');
+
+
     document.getElementById('nav-admin').style.setProperty('display', (isDev) ? '' : 'none', 'important');
 
     // Branch selector in topbar — only for manager (Dev doesn't need to filter operational reports)
@@ -889,6 +975,7 @@ function navigate(page) {
         report: 'التقرير اليومي',
         branches: 'إدارة الفروع',
         employees: 'الموظفين',
+        trainers: 'المدربين',
         finance: 'المالية',
         dailybudget: 'الميزانية اليومية',
         admin: 'الأدمن إديتور',
@@ -910,6 +997,10 @@ function navigate(page) {
         case 'report': renderReport(container); break;
         case 'branches': renderBranches(container); break;
         case 'employees': renderEmployees(container); break;
+
+        case 'trainers': renderTrainers(container); break;
+
+
         case 'finance': renderFinance(container); break;
         case 'dailybudget': renderDailyBudget(container); break;
         case 'admin': renderAdmin(container); break;
@@ -2733,6 +2824,42 @@ function renderAdmin(el) {
         </div>
     </div>
 
+    <!-- ====== TRAINERS SECTION ====== -->
+    <div class="form-section animate-in" style="border-color:var(--primary);">
+        <div class="form-section-header" style="background:var(--bg-input); color:var(--primary);">🏋️ إدارة المدربين</div>
+        <div class="form-section-body">
+            <div id="adminTrainerList"></div>
+            <div style="border-top:1px solid var(--border-color);margin-top:20px;padding-top:20px;">
+                <h4 style="margin-bottom:14px;font-size:15px;color:var(--text-primary);">➕ إضافة مدرب جديد</h4>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>اسم المدرب</label>
+                        <input type="text" id="newTrainerName" placeholder="الاسم">
+                    </div>
+                    <div class="form-group">
+                        <label>التخصص</label>
+                        <input type="text" id="newTrainerSpec" placeholder="مثال: يوجا، بوكسينج">
+                    </div>
+                    <div class="form-group">
+                        <label>الفرع</label>
+                        <select id="newTrainerBranch">
+                            ${getSortedBranchesEntries(BRANCHES).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>الراتب الأساسي</label>
+                        <input type="number" id="newTrainerSalary" placeholder="3000">
+                    </div>
+                    <div class="form-group">
+                        <label>النسبة (%)</label>
+                        <input type="number" id="newTrainerPercent" placeholder="10">
+                    </div>
+                </div>
+                <button class="btn btn-primary" style="margin-top:14px;" onclick="adminAddTrainer()">➕ إضافة المدرب</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ====== DANGER ZONE ====== -->
     <div class="form-section animate-in" style="border-color:#ffe3e3;">
         <div class="form-section-header" style="background:#fff5f5;color:#c92a2a;">⚠️ تصفير البيانات</div>
@@ -2765,9 +2892,61 @@ function renderAdmin(el) {
 
     renderAdminBranchList();
     renderAdminEmployeeList();
+
+    renderAdminTrainerList();
+
+
     renderAdminPasswordList();
     updateFolderStatusUI();
 }
+
+function renderAdminTrainerList() {
+    const container = document.getElementById('adminTrainerList');
+    if (!container) return;
+    if (TRAINERS.length === 0) {
+        container.innerHTML = '<div class="empty-state">لا يوجد مدربين</div>';
+        return;
+    }
+    container.innerHTML = `
+    <div class="table-wrapper"><table>
+        <thead><tr><th>المدرب</th><th>التخصص</th><th>الراتب</th><th>النسبة</th><th>الفرع</th><th>إجراءات</th></tr></thead>
+        <tbody>
+            ${TRAINERS.map(t => `
+            <tr>
+                <td><strong>${t.name}</strong></td>
+                <td>${t.specialty}</td>
+                <td>${t.salary} ج.م</td>
+                <td>${t.percentage}%</td>
+                <td>${BRANCHES[t.branch]?.name || t.branch}</td>
+                <td><button class="btn-remove" onclick="adminDeleteTrainer('${t.id}')">🗑️</button></td>
+            </tr>`).join('')}
+        </tbody>
+    </table></div>`;
+}
+
+window.adminAddTrainer = function () {
+    const name = document.getElementById('newTrainerName').value.trim();
+    const specialty = document.getElementById('newTrainerSpec').value.trim();
+    const branch = document.getElementById('newTrainerBranch').value;
+    const salary = parseFloat(document.getElementById('newTrainerSalary').value) || 0;
+    const percentage = parseFloat(document.getElementById('newTrainerPercent').value) || 0;
+
+    if (!name) return showToast('يرجى إدخال اسم المدرب', 'error');
+
+    const id = 'T' + Date.now();
+    TRAINERS.push({ id, name, specialty, branch, salary, percentage });
+    saveData();
+    renderAdmin(document.getElementById('pageContent'));
+    showToast('تم إضافة المدرب بنجاح! 🎉');
+};
+
+window.adminDeleteTrainer = function (id) {
+    if (!confirm('هل أنت متأكد من حذف هذا المدرب؟')) return;
+    TRAINERS = TRAINERS.filter(t => t.id !== id);
+    saveData();
+    renderAdmin(document.getElementById('pageContent'));
+    showToast('تم حذف المدرب', 'error');
+};
 
 async function updateFolderStatusUI() {
     const badge = document.getElementById('folderStatusBadge');
@@ -2910,9 +3089,26 @@ window.adminSaveManagerPass = function () {
 
 window.adminSaveBranchPass = function (key, val) {
     if (!BRANCHES[key]) return;
+
+    const pass = val.trim() || '7788';
+    BRANCHES[key].password = pass;
+    
+    // 1. Save locally
+    saveData();
+
+    // 2. Force direct cloud sync for the password node
+    if (window.db) {
+        db.ref(AppState.systemSecret + '/bms/branches/' + key + '/password').set(pass)
+            .then(() => console.log(`☁️ Cloud Sync: Branch ${key} password updated.`))
+            .catch(err => console.error("❌ Cloud Sync Failed:", err));
+    }
+    
+    showToast(`تم تحديث كلمة مرور فرع ${BRANCHES[key].name} أونلاين ✅`, 'success');
+
     BRANCHES[key].password = val.trim() || '7788';
     saveData();
     showToast(`تم تحديث كلمة مرور فرع ${BRANCHES[key].name}`, 'success');
+
 };
 
 function renderAdminPasswordList() {
@@ -3082,37 +3278,77 @@ window.adminAddEmployee = function () {
 };
 
 window.adminClearReports = function () {
+
+    if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع التقارير اليومية واليوميات المالية نهائياً!')) return;
+    
+
     if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع التقارير اليومية نهائياً!')) return;
+
     AppState.reports = [];
-    localStorage.setItem('bms_reports', JSON.stringify(AppState.reports));
-    showToast('تم تصفير جميع التقارير', 'error');
+    AppState.ledgers = {};
+    
+    saveData();
+    showToast('تم تصفير جميع التقارير والبيانات المالية', 'error');
+    
+    // Refresh UI if on relevant pages
+    if (['dashboard', 'finance', 'report', 'dailybudget'].includes(AppState.currentPage)) {
+        navigate(AppState.currentPage);
+    }
 };
 
 window.adminClearEmployees = function () {
     if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع الموظفين من كل الفروع!')) return;
     EMPLOYEES = [];
     saveData();
-    renderAdminEmployeeList();
-    renderAdminBranchList();
+    renderAdmin(document.getElementById('pageContent'));
     showToast('تم تصفير جميع الموظفين', 'error');
 };
 
 window.adminClearBranches = function () {
+
+    if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع الفروع وكل ما يتعلق بها!')) return;
+
     if (!confirm('⚠️ هل أنت متأكد؟ سيتم حذف جميع الفروع وجميع الموظفين معهم!')) return;
+
     BRANCHES = {};
     EMPLOYEES = [];
+    AppState.reports = [];
+    AppState.ledgers = {};
+    AppState.budgets = [];
+    
     saveData();
-    renderAdminBranchList();
-    renderAdminEmployeeList();
-    showToast('تم تصفير جميع الفروع والموظفين', 'error');
+    renderAdmin(document.getElementById('pageContent'));
+    showToast('تم تصفير جميع الفروع وكل البيانات', 'error');
 };
 
 window.adminResetAll = function () {
+
+    if (!confirm('⛔ هل أنت متأكد من إعادة ضبط المصنع الكامل؟\n\nسيتم حذف:\n• جميع الفروع\n• جميع الموظفين\n• جميع التقارير\n• جميع الحركات المالية (اليوميات)\n\nوإعادتها للإعدادات الافتراضية!')) return;
+    
+
     if (!confirm('⛔ هل أنت متأكد من إعادة ضبط المصنع الكامل؟\n\nسيتم حذف:\n• جميع الفروع\n• جميع الموظفين\n• جميع التقارير\n\nوإعادتها للإعدادات الافتراضية!')) return;
+
     BRANCHES = { ...DEFAULT_BRANCHES };
     EMPLOYEES = [...DEFAULT_EMPLOYEES];
+    TRAINERS = [...DEFAULT_TRAINERS];
     AppState.reports = [];
+    AppState.ledgers = {};
+    AppState.budgets = [];
+    
     saveData();
+    
+    // Clear cloud totally to ensure fresh start
+    if (window.db) {
+        db.ref(AppState.systemSecret + '/bms').set({
+            branches: DEFAULT_BRANCHES,
+            employees: DEFAULT_EMPLOYEES,
+            trainers: DEFAULT_TRAINERS,
+            reports: [],
+            budgets: [],
+            ledgers: {}
+        });
+    }
+    
     renderAdmin(document.getElementById('pageContent'));
     showToast('تم إعادة ضبط المصنع بالكامل ✅');
 };
@@ -3449,8 +3685,13 @@ function saveLedgerEntry(key) {
 window.isLedgerActive = function (key) {
     const l = AppState.ledgers[key];
     if (!l) return false;
-    if (parseFloat(l.previousBalance) > 0) return true;
-    return l.rows.some(r => parseFloat(r.value) > 0 || parseFloat(r.expense) > 0);
+    
+    // Only consider ledger active if it has actual transaction rows with values
+    return l.rows && l.rows.some(r => {
+        const val = parseFloat(r.value) || 0;
+        const exp = parseFloat(r.expense) || 0;
+        return val > 0 || exp > 0;
+    });
 };
 
 window.calculateLedgerInflow = function (key) {
