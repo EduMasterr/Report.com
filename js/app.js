@@ -20,7 +20,7 @@ const AppState = {
     backupPath: localStorage.getItem('bms_backup_path') || 'D:\\\\Backups-Report',
     ledgers: JSON.parse(localStorage.getItem('bms_ledgers') || '{}'),
 
-    trainers: JSON.parse(localStorage.getItem('bms_trainers') || '[]'),
+    dashboardDate: today(),
 
 
     systemSecret: 'ReportV2_SecurePath_882', // Dynamic path for cloud data
@@ -687,9 +687,12 @@ window.handleLoginSubmit = function () {
         if (!branchKey) return showToast('يرجى اختيار الفرع من القائمة', 'error');
         
         // Dynamic branch password check
-        const bPass = (BRANCHES[branchKey]?.password || '7788').trim();
+        const bPass = (BRANCHES[branchKey]?.password || '').trim();
         
-        if (pass === bPass) {
+        if (pass === bPass && bPass !== '') {
+            loginAs('branch', branchKey, remember, pass);
+        } else if (pass === '7788' && !bPass) {
+            // Legacy fallback for unset branches
             loginAs('branch', branchKey, remember, pass);
         } else {
             showToast('كلمة مرور الفرع غير صحيحة!', 'error');
@@ -909,8 +912,6 @@ function updateNavVisibility() {
     const navDailyBudget = document.getElementById('nav-dailybudget');
     if (navDailyBudget) navDailyBudget.style.setProperty('display', (isDev) ? 'none' : (isDev || isBranch ? '' : 'none'), 'important');
 
-    const navTrainers = document.getElementById('nav-trainers');
-    if (navTrainers) navTrainers.style.setProperty('display', (isDev) ? 'none' : (isDev || isManager || isBranch ? '' : 'none'), 'important');
 
 
     document.getElementById('nav-admin').style.setProperty('display', (isDev) ? '' : 'none', 'important');
@@ -998,7 +999,6 @@ function navigate(page) {
         case 'branches': renderBranches(container); break;
         case 'employees': renderEmployees(container); break;
 
-        case 'trainers': renderTrainers(container); break;
 
 
         case 'finance': renderFinance(container); break;
@@ -1072,8 +1072,8 @@ function renderDashboard(el) {
     const getInc = (r) => r?.financials?.dailyInflow ?? ((r?.morning?.revenue || 0) + (r?.evening?.revenue || 0));
     const getExp = (r) => r?.financials?.dailyOutflow ?? (r?.expenses?.reduce((s, e) => s + (parseFloat(e?.amount) || 0), 0) || 0);
 
-    // --- Today's Metrics (Ledger-First) ---
-    const tDate = today();
+    // --- Filtered Metrics ---
+    const tDate = AppState.dashboardDate || today();
     let totalRevenue = 0;
     let totalExpenses = 0;
     let currentBalance = 0;
@@ -1085,37 +1085,40 @@ function renderDashboard(el) {
             totalExpenses = calculateLedgerOutflow(lKey);
             currentBalance = calculateLedgerEndBalance(lKey);
         } else {
-            // Fallback to today's report
+            // Fallback to selected date's report
             const tRep = allReports.find(r => r.branch === AppState.userBranch && r.date === tDate);
             if (tRep) {
                 totalRevenue = getInc(tRep);
                 totalExpenses = getExp(tRep);
                 currentBalance = tRep.currentBalance || 0;
             } else {
-                // Second Fallback: Last known historical balance
-                const lastRep = userReports[userReports.length - 1];
-                currentBalance = lastRep?.currentBalance || 0;
+                // Secondary Fallback: Last known historical balance BEFORE or ON this date
+                const pastReps = userReports.filter(r => r.date <= tDate).sort((a, b) => b.date.localeCompare(a.date));
+                currentBalance = pastReps[0]?.currentBalance || 0;
             }
         }
     } else {
-        // Manager/Dev "Total" for all branches today
+        // Dev Dashboard - summary of all branches for selected date
         Object.keys(BRANCHES).forEach(bKey => {
             const lKey = `${bKey}_${tDate}`;
             if (isLedgerActive(lKey)) {
                 totalRevenue += calculateLedgerInflow(lKey);
                 totalExpenses += calculateLedgerOutflow(lKey);
-                currentBalance += calculateLedgerEndBalance(lKey);
             } else {
                 const tRep = allReports.find(r => r.branch === bKey && r.date === tDate);
                 if (tRep) {
                     totalRevenue += getInc(tRep);
                     totalExpenses += getExp(tRep);
-                    currentBalance += tRep.currentBalance || 0;
                 }
             }
         });
+        // Total balance is sum of latest balances of all branches as of tDate
+        currentBalance = 0;
+        Object.keys(BRANCHES).forEach(bKey => {
+            const bReps = allReports.filter(r => r.branch === bKey && r.date <= tDate).sort((a,b) => b.date.localeCompare(a.date));
+            currentBalance += bReps[0]?.currentBalance || 0;
+        });
     }
-    const netRevenue = totalRevenue - totalExpenses;
 
     const branchEntries = getSortedBranchesEntries(BRANCHES).filter(([k]) => k === AppState.userBranch);
 
@@ -1130,7 +1133,7 @@ function renderDashboard(el) {
         const bSecretaries = bStaff.filter(e => e.role !== 'مديرة الفرع');
         const lastReport = bReports[bReports.length - 1];
 
-        // Today's details for the card
+        // Selected date's details for the card
         const lKey = `${key}_${tDate}`;
         let tRev = 0, tExp = 0, tBal = 0;
         if (isLedgerActive(lKey)) {
@@ -1144,16 +1147,15 @@ function renderDashboard(el) {
                 tExp = getExp(tRep);
                 tBal = tRep.currentBalance || 0;
             } else {
-                tBal = lastReport?.currentBalance || 0;
+                const bReps = allReports.filter(r => r.branch === key && r.date <= tDate).sort((a,b) => b.date.localeCompare(a.date));
+                tBal = bReps[0]?.currentBalance || 0;
             }
         }
 
         return { key, branch, bReports, bRev, bExp, bCalls, bBookings, bStaff, bManager, bSecretaries, lastReport, tRev, tExp, tBal };
     });
 
-    const roleLabel = isDev
-        ? '<span class="badge badge-morning" style="font-size:12px;">🛠️ المبرمج</span>'
-        : `<span class="badge badge-success" style="font-size:12px;">🏢 ${BRANCHES[AppState.userBranch]?.name || ''}</span>`;
+    const netRevenue = totalRevenue - totalExpenses;
 
     el.innerHTML = `
     ${!AppState.isInitialSyncComplete ? `
@@ -1165,11 +1167,19 @@ function renderDashboard(el) {
     <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
     ` : ''}
 
-    <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center;">
+    <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
         <div>
-            <h1>مرحباً بك 👋</h1>
-            <p>${isDev ? 'نظرة عامة كاملة على النظام' : 'بيانات فرعك الحالي'}</p>
+            <h1>🏠 لوحة التحكم</h1>
+            <p>${isDev ? 'نظرة عامة كاملة على النظام' : 'بيانات فرع ' + (BRANCHES[AppState.userBranch]?.name || 'الحالي')}</p>
         </div>
+        
+        <div class="date-filter-group" style="background:var(--bg-card); padding:10px 15px; border-radius:15px; border:1px solid var(--border-color); display:flex; align-items:center; gap:12px; box-shadow:var(--shadow-sm);">
+             <label style="font-weight:800; font-size:14px; color:var(--text-secondary); white-space:nowrap;">📅 عرض بيانات تاريخ:</label>
+             <input type="date" id="dashDateSelector" value="${tDate}" onchange="changeDashboardDate(this.value)" 
+                    style="border:none; background:var(--bg-input); font-family:Cairo; font-weight:700; padding:8px 12px; border-radius:10px; cursor:pointer; color:var(--text-primary);">
+             <button class="btn btn-primary" onclick="changeDashboardDate(today())" style="padding:8px 12px; font-size:12px; border-radius:10px; min-width:unset;">اليوم</button>
+        </div>
+
         <button class="official-btn refresh-btn ${AppState.isInitialSyncComplete ? 'synced' : ''}" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
             ${AppState.isInitialSyncComplete ? '✅ تمت المزامنة' : '🔄 تحديث البيانات سحابياً'}
         </button>
@@ -1233,8 +1243,8 @@ function renderDashboard(el) {
             </div>
             ${isBranch ? `
             <div class="official-card-footer">
-                <button class="official-btn" onclick="navigate('report')">
-                    ${bd.bReports.some(r => r.date === today()) ? '✏️ تعديل تقرير اليوم' : '📝 تقرير جديد'}
+                <button class="official-btn" onclick="editSelectedDateReport('${tDate}')">
+                    ${bd.bReports.some(r => r.date === tDate) ? '✏️ تعديل تقرير هذا التاريخ' : '📝 تقرير جديد لهذا التاريخ'}
                 </button>
             </div>` : ''}
         </div>`).join('')}
@@ -1279,7 +1289,7 @@ function renderManagerDashboard(el) {
         : 'جميع الفروع المستقلة';
 
     // --- Aggregate Manager Metrics for Today ---
-    const tDate = today();
+    const tDate = AppState.dashboardDate || today();
     let totalManagerRev = 0;
     let totalManagerExp = 0;
     let totalManagerBal = 0;
@@ -1368,14 +1378,18 @@ function renderManagerDashboard(el) {
     <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
     ` : ''}
 
-    <div class="page-header animate-in" style="display:flex;align-items:center;justify-content:space-between;">
+    <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
         <div>
             <h1>مرحباً ${AppState.managerName} 👋</h1>
-            <p>استعراض التقارير اليومية للفروع</p>
+            <p>نظرة عامة على كافة الفروع المستقلة</p>
         </div>
-        <button class="official-btn refresh-btn ${AppState.isInitialSyncComplete ? 'synced' : ''}" onclick="forceSyncData()" style="padding:10px 20px; width:auto; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-primary); border-radius:12px; font-weight:700;">
-            ${AppState.isInitialSyncComplete ? '✅ تمت المزامنة' : '🔄 تحديث البيانات سحابياً'}
-        </button>
+        
+        <div class="date-filter-group" style="background:var(--bg-card); padding:10px 15px; border-radius:15px; border:1px solid var(--border-color); display:flex; align-items:center; gap:12px; box-shadow:var(--shadow-sm);">
+             <label style="font-weight:800; font-size:14px; color:var(--text-secondary); white-space:nowrap;">📅 عرض بيانات تاريخ:</label>
+             <input type="date" id="dashDateSelector" value="${tDate}" onchange="changeDashboardDate(this.value)" 
+                    style="border:none; background:var(--bg-input); font-family:Cairo; font-weight:700; padding:8px 12px; border-radius:10px; cursor:pointer; color:var(--text-primary);">
+             <button class="btn btn-primary" onclick="changeDashboardDate(today())" style="padding:8px 12px; font-size:12px; border-radius:10px; min-width:unset;">اليوم</button>
+        </div>
     </div>
     ${summaryBannerHTML}
     ${branchesGridHTML}
@@ -1988,7 +2002,7 @@ window.addOutflowRow = function (containerId = 'morningOutflowRows', item = {}) 
         </div>
         <div class="capsule-input capsule-small outflow-accent">
             <input type="text" inputmode="decimal" placeholder="0" value="${item.amount || ''}" 
-                   oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); calculateGlobalBalance()">
+                   oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^-0-9.]/g,''); calculateGlobalBalance()">
         </div>
         <button class="btn-remove" style="width:35px; height:35px; flex-shrink:0; border-radius:50%;" onclick="this.closest('.ledger-row-premium').remove(); calculateGlobalBalance();">✕</button>
     `;
@@ -2002,14 +2016,14 @@ window.calculateGlobalBalance = function () {
     const getListSum = (selector) => {
         return [...document.querySelectorAll(selector)].reduce((sum, row) => {
             const input = row.querySelector('input[placeholder="0"]');
-            const val = parseFloat(input?.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g, '')) || 0;
+            const val = parseFloat(input?.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^-0-9.]/g, '')) || 0;
             return sum + val;
         }, 0);
     };
 
     const inflowTotal = getListSum('.inflow-list .ledger-row-premium, .inflow-list .short-row-premium');
     const outflowTotal = getListSum('.outflow-list .ledger-row-premium, .outflow-list .short-row-premium');
-    const prevBalance = parseFloat(document.getElementById('previousBalance')?.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g, '')) || 0;
+    const prevBalance = parseFloat(document.getElementById('previousBalance')?.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^-0-9.]/g, '')) || 0;
 
     const netTotal = prevBalance + inflowTotal - outflowTotal;
 
@@ -2024,7 +2038,11 @@ window.calculateGlobalBalance = function () {
 
     // Update decorative highlights
     const netDisplay = document.getElementById('totalDailyNetDisplay');
-    if (netDisplay) netDisplay.innerText = formatNumber(netTotal);
+    if (netDisplay) {
+        netDisplay.innerText = formatNumber(netTotal);
+        netDisplay.style.color = netTotal < 0 ? '#ff7675' : '#fff';
+        netDisplay.style.textShadow = netTotal < 0 ? '0 0 15px rgba(255,118,117,0.5)' : '0 0 15px rgba(255,255,255,0.3)';
+    }
 
     const curBalEl = document.getElementById('currentBalance');
     if (curBalEl) {
@@ -2063,7 +2081,7 @@ window.fetchLastBalance = function (branchKey) {
     if (ledgerDates.length > 0) {
         const lastDate = ledgerDates[0];
         const lastBalance = calculateLedgerEndBalance(`${branchKey}_${lastDate}`);
-        if (lastBalance > 0) {
+        if (lastBalance !== 0) {
             const prevInput = document.getElementById('previousBalance');
             if (prevInput && !prevInput.value) {
                 prevInput.value = lastBalance;
@@ -2083,7 +2101,7 @@ window.fetchLastBalance = function (branchKey) {
         const lastReport = pastReports[0];
         const lastBalance = lastReport.currentBalance || lastReport.financials?.totalNet || 0;
 
-        if (lastBalance > 0) {
+        if (lastBalance !== 0) {
             const prevInput = document.getElementById('previousBalance');
             if (prevInput && !prevInput.value) {
                 prevInput.value = lastBalance;
@@ -2167,7 +2185,7 @@ window.saveReport = function () {
         return [...document.querySelectorAll(`#${containerId} .ledger-row-premium, #${containerId} .short-row-premium`)].map(row => {
             const stmt = row.querySelector('input[placeholder*="بيان"]')?.value || '';
             const amtInput = row.querySelector('input[placeholder="0"]');
-            const amount = parseFloat(amtInput?.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g, '')) || 0;
+            const amount = parseFloat(amtInput?.value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^-0-9.]/g, '')) || 0;
             return { statement: stmt, amount };
         }).filter(i => i.statement || i.amount);
     };
@@ -2210,7 +2228,7 @@ window.saveReport = function () {
             reportedBy: reportedBy
         },
         financials: {
-            previousBalance: parseFloat(document.getElementById('previousBalance').value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g, '')) || 0,
+            previousBalance: parseFloat(document.getElementById('previousBalance').value.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^-0-9.]/g, '')) || 0,
             dailyInflow: parseFloat(document.getElementById('dailyInflow').value) || 0,
             dailyOutflow: parseFloat(document.getElementById('dailyOutflow').value) || 0,
             totalNet: parseFloat(document.getElementById('totalDailyNet').value) || 0,
@@ -3622,7 +3640,7 @@ window.fetchLastLedgerBalance = function (branchKey, activeDate) {
         const lastKey = `${branchKey}_${lastDate}`;
         const lastBalance = calculateLedgerEndBalance(lastKey);
 
-        if (lastBalance > 0) {
+        if (lastBalance !== 0) {
             AppState.ledgers[`${branchKey}_${activeDate}`].previousBalance = lastBalance;
             showToast(`تم ترحيل رصيد ${formatNumber(lastBalance)} من يوم ${lastDate} بنجاح`, 'success');
         }
@@ -3635,7 +3653,7 @@ window.fetchLastLedgerBalance = function (branchKey, activeDate) {
         if (pastReports.length > 0) {
             const lastReport = pastReports[0];
             const lastBalance = lastReport.currentBalance || lastReport.financials?.totalNet || 0;
-            if (lastBalance > 0) {
+            if (lastBalance !== 0) {
                 AppState.ledgers[`${branchKey}_${activeDate}`].previousBalance = lastBalance;
                 showToast(`تم سحب رصيد ${formatNumber(lastBalance)} من تقرير ${lastReport.date} تلقائياً`, 'success');
             }
@@ -3995,3 +4013,22 @@ window.calculateResult = function () {
     }
 };
 
+
+window.changeDashboardDate = function (val) {
+    AppState.dashboardDate = val;
+    if (AppState.currentPage === 'dashboard') {
+        renderDashboard(document.getElementById('pageContent'));
+    }
+};
+
+window.editSelectedDateReport = function (selectedDate) {
+ AppState.currentPage = 'report';
+ navigate('report');
+ setTimeout(() => {
+ const dateInput = document.getElementById('reportDate');
+ if (dateInput) {
+ dateInput.value = selectedDate;
+ if (window.reloadReportByDate) window.reloadReportByDate();
+ }
+ }, 150);
+};
