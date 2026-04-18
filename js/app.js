@@ -3656,32 +3656,33 @@ window.renderDailyBudget = function (el) {
     const dayName = arabicDate(activeDate).split('،')[0];
 
     el.innerHTML = `
-    <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
-        <div>
-            <h1 style="color:var(--text-primary); font-weight:900;">📊 اليومية والميزانية</h1>
-            <p style="opacity:0.7; color:var(--text-secondary);">إدارة الحركات المالية لفرع ${BRANCHES[bKey]?.name || bKey}</p>
-        </div>
-        <div style="display:flex; gap:15px; align-items:center; background:var(--bg-card); padding:8px 15px; border-radius:100px; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
-            <!-- TODAY BUTTON -->
-            <button class="official-btn" style="width:auto; padding:8px 20px; margin:0; border-radius:100px; background:var(--primary); color:#fff; border:none; font-weight:bold;" onclick="resetLedgerToToday()">📅 اليوم</button>
-            
-            <!-- DATE SELECTOR -->
-            <input type="date" id="ledgerDateSelector" class="form-input" value="${activeDate}" onchange="changeLedgerDate(this.value)" style="border:none; background:transparent; font-weight:900; color:var(--text-primary); outline:none; width:130px;">
-            
-            <!-- PREVIOUS BALANCE CAPSULE -->
-            <div class="capsule-input" style="background:#f1c40f22 !important; border-color:#f1c40f !important; padding:5px 15px !important; min-width:160px; position:relative;">
-                <label style="font-size:11px; color:#d35400; font-weight:bold; margin-left:8px;">الإيراد السابق:</label>
-                <input type="text" id="ledgerPrevBalance" value="${ledger.previousBalance || ''}" placeholder="0" 
-                       oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); updateLedgerPreviousBalance('${ledgerKey}', this.value)" 
-                       style="color:#d35400 !important; font-size:16px !important; width:90px; background:transparent; border:none; outline:none; font-weight:900;">
+    <div id="ledgerCaptureArea" style="background:var(--bg-card); padding:10px; border-radius:30px;">
+        <div class="page-header animate-in" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px; padding: 10px 20px;">
+            <div>
+                <h1 style="color:var(--text-primary); font-weight:900;">📊 اليومية والميزانية</h1>
+                <p style="opacity:0.7; color:var(--text-secondary);">إدارة الحركات المالية لفرع ${BRANCHES[bKey]?.name || bKey}</p>
             </div>
+            <div style="display:flex; gap:15px; align-items:center; background:var(--bg-card); padding:8px 15px; border-radius:100px; border:1px solid var(--border-color); box-shadow:var(--shadow-sm);">
+                <!-- TODAY BUTTON -->
+                <button class="official-btn" style="width:auto; padding:8px 20px; margin:0; border-radius:100px; background:var(--primary); color:#fff; border:none; font-weight:bold;" onclick="resetLedgerToToday()">📅 اليوم</button>
+                
+                <!-- DATE SELECTOR -->
+                <input type="date" id="ledgerDateSelector" class="form-input" value="${activeDate}" onchange="changeLedgerDate(this.value)" style="border:none; background:transparent; font-weight:900; color:var(--text-primary); outline:none; width:130px;">
+                
+                <!-- PREVIOUS BALANCE CAPSULE -->
+                <div class="capsule-input" style="background:#f1c40f22 !important; border-color:#f1c40f !important; padding:5px 15px !important; min-width:160px; position:relative;">
+                    <label style="font-size:11px; color:#d35400; font-weight:bold; margin-left:8px;">الإيراد السابق:</label>
+                    <input type="text" id="ledgerPrevBalance" value="${ledger.previousBalance || ''}" placeholder="0" 
+                           oninput="this.value=this.value.replace(/[٠-٩]/g, d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^0-9.]/g,''); updateLedgerPreviousBalance('${ledgerKey}', this.value)" 
+                           style="color:#d35400 !important; font-size:16px !important; width:90px; background:transparent; border:none; outline:none; font-weight:900;">
+                </div>
 
-            ${!isBranch ? `
-            <select class="form-input" onchange="changeLedgerBranch(this.value)" style="border:none; background:transparent; font-weight:900; border-right:1px solid var(--border-color); padding-right:15px; color:var(--text-primary); outline:none;">
-                ${Object.entries(BRANCHES).map(([k, v]) => `<option value="${k}" ${k === bKey ? 'selected' : ''}>${v.name}</option>`).join('')}
-            </select>` : ''}
+                ${!isBranch ? `
+                <select class="form-input" onchange="changeLedgerBranch(this.value)" style="border:none; background:transparent; font-weight:900; border-right:1px solid var(--border-color); padding-right:15px; color:var(--text-primary); outline:none;">
+                    ${Object.entries(BRANCHES).map(([k, v]) => `<option value="${k}" ${k === bKey ? 'selected' : ''}>${v.name}</option>`).join('')}
+                </select>` : ''}
+            </div>
         </div>
-    </div>
 
         <!-- MODERN LEDGER TABLE HEADER -->
         <div class="official-table-grid" style="grid-template-columns: 50px 1.5fr 110px 110px 1.5fr 110px 1.5fr 1.8fr; background: #2c3e50; color:#fff; font-weight:950; font-size:13px; text-align:center; border-radius:100px; margin-bottom:15px; padding:15px 0; box-shadow:0 8px 15px rgba(0,0,0,0.1); gap:10px;">
@@ -3739,13 +3740,13 @@ window.renderDailyBudget = function (el) {
             `).join('')}
         </div>
 
-        <div style="display:flex; justify-content:center; gap:15px; margin-top:15px;">
+        <div style="display:flex; justify-content:center; gap:15px; margin-top:15px;" class="no-pdf">
             <button class="official-btn" style="flex:1; padding:15px 40px; border-radius:100px; background:rgba(0, 128, 128, 0.1); color:var(--primary); border:2px dashed var(--primary); font-size:16px; font-weight:900; cursor:pointer; transition:0.3s;" onclick="addLedgerRow('${ledgerKey}')">+ إضافة بيان جديد</button>
             <button class="official-btn" style="flex:1; padding:15px 40px; border-radius:100px; background:var(--gradient-primary); color:#fff; border:none; font-size:16px; font-weight:900; box-shadow:0 10px 30px rgba(0,0,0,0.15); cursor:pointer;" onclick="saveLedger('${ledgerKey}')">💾 حفظ الحركات</button>
         </div>
 
         <!-- FOOTER NEON CARDS -->
-        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px; margin-top:30px;">
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px; margin-top:30px; padding-bottom: 20px;">
             <div class="neon-summary-card" style="background:rgba(39,174,96,0.1); border:1px solid rgba(39,174,96,0.3); border-radius:20px; padding:20px; text-align:center; box-shadow: 0 0 15px rgba(39,174,96,0.1);">
                 <div style="color:#2ecc71; font-size:13px; font-weight:700; margin-bottom:10px;">🟢 إجمالي الوارد اليوم</div>
                 <div id="ledgerTotalInflow" style="font-size:28px; font-weight:950; color:#2ecc71;">${formatNumber(calculateLedgerInflow(ledgerKey))}</div>
@@ -3759,6 +3760,7 @@ window.renderDailyBudget = function (el) {
                 <div id="ledgerEndBalance" style="font-size:32px; font-weight:950; color:#fff; text-shadow: 0 0 15px rgba(255,255,255,0.3);">${formatNumber(calculateLedgerEndBalance(ledgerKey))}</div>
             </div>
         </div>
+    </div>
     </div>
 
     <!-- ACTIONS BUTTONS -->
@@ -3797,6 +3799,10 @@ window.exportLedgerPDF = async function (key) {
             }
         }
     });
+
+    // EXCLUDE BUTTONS FROM PDF
+    const noPdfElements = element.querySelectorAll('.no-pdf');
+    noPdfElements.forEach(el => el.style.display = 'none');
 
     // Force solid backgrounds for gradients to prevent html2canvas fading
     const gradientEls = element.querySelectorAll('[style*="linear-gradient"]');
@@ -3843,6 +3849,7 @@ window.exportLedgerPDF = async function (key) {
                 input.style.fontWeight = '';
                 input.style.background = 'transparent';
             });
+            noPdfElements.forEach(el => el.style.display = 'flex');
             oldGradients.forEach(item => {
                 item.el.style.background = item.bg;
             });
